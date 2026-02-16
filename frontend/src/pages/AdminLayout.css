@@ -9,6 +9,11 @@
   color: white;
   display: flex;
   flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .nav-header {
@@ -72,4 +77,5 @@
   padding: 2rem;
   background: #fafafa;
   overflow-y: auto;
+  margin-left: 250px;
 }
