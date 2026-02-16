@@ -173,6 +173,35 @@ export default function AdminStats() {
             </div>
           </div>
         </div>
+
+        {Object.keys(stats.model_latencies || {}).length > 0 && (
+          <div className="stat-card latency-card" style={{ gridColumn: '1 / -1' }}>
+            <h3>Model Performance (Latency per 100 Tokens)</h3>
+            <div className="latency-grid">
+              {Object.values(stats.model_latencies).map((modelStats) => (
+                <div key={modelStats.model_name} className="latency-item">
+                  <div className="model-name">{modelStats.model_name}</div>
+                  <div className="latency-stats">
+                    <div className="latency-stat">
+                      <span className="latency-label">Avg Latency</span>
+                      <span className="latency-value">
+                        {modelStats.avg_latency_per_100_tokens.toFixed(1)}ms / 100 tokens
+                      </span>
+                    </div>
+                    <div className="latency-stat">
+                      <span className="latency-label">Total Calls</span>
+                      <span className="latency-value">{modelStats.total_calls}</span>
+                    </div>
+                    <div className="latency-stat">
+                      <span className="latency-label">Total Tokens</span>
+                      <span className="latency-value">{modelStats.total_tokens.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 import os
 import json
 import asyncio
-from typing import List, Dict, Any, AsyncGenerator, Optional
+import time
+from typing import List, Dict, Any, AsyncGenerator, Optional, Tuple
 from datetime import datetime
 import logging
 
@@ -84,7 +85,7 @@ class CustomerSupportAgent:
             )
             return fallback
     
-    async def process_message(self, user_message: str, acknowledgment: Optional[str] = None) -> AsyncGenerator[str, None]:
+    async def process_message(self, user_message: str, acknowledgment: Optional[str] = None) -> AsyncGenerator[Tuple[str, Optional[float]], None]:
         """
         Process user message and stream response.
         
@@ -93,7 +94,7 @@ class CustomerSupportAgent:
             acknowledgment: Optional acknowledgment phrase that was played (e.g., "Hmm...")
         
         Yields:
-            Response text chunks
+            Tuple of (response text chunk, latency_ms) - latency only on first chunk
         """
         try:
             self.conversation_history.append(
@@ -110,13 +111,31 @@ class CustomerSupportAgent:
             if acknowledgment:
                 logger.info(f"With acknowledgment: {acknowledgment}")
             
+            start_time = time.time()
             response_stream = await self.llm.astream_chat(self.conversation_history)
             
             full_response = ""
+            chunk_count = 0
+            first_chunk_time = None
+            
             async for chunk in response_stream:
                 if chunk.delta:
+                    if first_chunk_time is None:
+                        first_chunk_time = time.time()
                     full_response += chunk.delta
-                    yield chunk.delta
+                    chunk_count += 1
+                    # Only send latency with first chunk
+                    if chunk_count == 1 and first_chunk_time:
+                        yield chunk.delta, (first_chunk_time - start_time) * 1000
+                    else:
+                        yield chunk.delta, None
+            
+            end_time = time.time()
+            total_latency_ms = (end_time - start_time) * 1000
+            
+            # Log the complete response received from OpenRouter
+            logger.info(f"OpenRouter Response - {chunk_count} chunks in {total_latency_ms:.0f}ms")
+            logger.info(f"Full output: {full_response}")
             
             # Update the last assistant message with full response
             # Remove the acknowledgment-only message if it exists
@@ -126,8 +145,6 @@ class CustomerSupportAgent:
             self.conversation_history.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content=full_response)
             )
-            
-            logger.info(f"Generated response: {full_response}")
         
         except Exception as e:
             logger.error(f"Error processing message: {e}")
@@ -135,7 +152,7 @@ class CustomerSupportAgent:
             self.conversation_history.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content=error_response)
             )
-            yield error_response
+            yield error_response, None
     
     async def generate_summary(self) -> str:
         """

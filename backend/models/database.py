@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .schemas import (
     Call, CallStatus, Settings, SystemStats, InformationToGather,
-    UsageStats, CostStats, Message, ToolCall
+    UsageStats, CostStats, Message, ToolCall, ModelLatencyStats
 )
 
 
@@ -40,6 +40,10 @@ class Database:
             default_settings = Settings(
                 model_name=default_model,
                 temperature=0.7,
+                price_per_million_input_tokens=3.0,
+                price_per_million_output_tokens=15.0,
+                price_per_5s_transcription=0.03,
+                price_per_10k_tts_chars=0.30,
                 information_to_gather=[
                     InformationToGather(
                         id=str(uuid.uuid4()),
@@ -76,13 +80,14 @@ class Database:
         with open(file_path, 'w') as f:
             json.dump(data, f, indent=2)
     
-    async def create_call(self) -> Call:
+    async def create_call(self, model_name: str = "anthropic/claude-3.5-sonnet") -> Call:
         """Create a new call."""
         async with self.lock:
             call = Call(
                 id=str(uuid.uuid4()),
                 start_time=datetime.now().isoformat(),
-                status=CallStatus.PENDING
+                status=CallStatus.PENDING,
+                model_name=model_name
             )
             
             calls = self._read_json(self.calls_file)
@@ -227,7 +232,10 @@ class Database:
     async def update_stats(
         self,
         usage_delta: Optional[UsageStats] = None,
-        cost_delta: Optional[CostStats] = None
+        cost_delta: Optional[CostStats] = None,
+        model_name: Optional[str] = None,
+        call_tokens: Optional[int] = None,
+        call_latency_ms: Optional[float] = None
     ):
         """Update system statistics."""
         async with self.lock:
@@ -241,6 +249,7 @@ class Database:
                 stats.total_usage.transcription_seconds += usage_delta.transcription_seconds
                 stats.total_usage.tts_characters += usage_delta.tts_characters
                 stats.total_usage.llm_calls += usage_delta.llm_calls
+                stats.total_usage.llm_latency_ms += usage_delta.llm_latency_ms
             
             if cost_delta:
                 stats.total_costs.llm_input_cost += cost_delta.llm_input_cost
@@ -248,6 +257,24 @@ class Database:
                 stats.total_costs.transcription_cost += cost_delta.transcription_cost
                 stats.total_costs.tts_cost += cost_delta.tts_cost
                 stats.total_costs.total_cost += cost_delta.total_cost
+            
+            # Update model-specific latency stats
+            if model_name and call_tokens and call_latency_ms:
+                if model_name not in stats.model_latencies:
+                    stats.model_latencies[model_name] = ModelLatencyStats(
+                        model_name=model_name
+                    )
+                
+                model_stats = stats.model_latencies[model_name]
+                model_stats.total_calls += 1
+                model_stats.total_tokens += call_tokens
+                model_stats.total_latency_ms += call_latency_ms
+                
+                # Calculate average latency per 100 tokens
+                if model_stats.total_tokens > 0:
+                    model_stats.avg_latency_per_100_tokens = (
+                        model_stats.total_latency_ms / model_stats.total_tokens
+                    ) * 100
             
             stats.last_updated = datetime.now().isoformat()
             

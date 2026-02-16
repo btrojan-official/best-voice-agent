@@ -13,6 +13,12 @@ export default function AdminSettings() {
   const [temperature, setTemperature] = useState(0.7);
   const [newInfoTitle, setNewInfoTitle] = useState("");
   const [newInfoDescription, setNewInfoDescription] = useState("");
+  
+  // Pricing state
+  const [priceInputTokens, setPriceInputTokens] = useState(3.0);
+  const [priceOutputTokens, setPriceOutputTokens] = useState(15.0);
+  const [priceTranscription, setPriceTranscription] = useState(0.03);
+  const [priceTTS, setPriceTTS] = useState(0.30);
 
   useEffect(() => {
     loadSettings();
@@ -24,6 +30,10 @@ export default function AdminSettings() {
       setSettings(data);
       setModelName(data.model_name);
       setTemperature(data.temperature);
+      setPriceInputTokens(data.price_per_million_input_tokens);
+      setPriceOutputTokens(data.price_per_million_output_tokens);
+      setPriceTranscription(data.price_per_5s_transcription);
+      setPriceTTS(data.price_per_10k_tts_chars);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load settings");
@@ -58,6 +68,25 @@ export default function AdminSettings() {
       await loadSettings();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update temperature");
+    }
+  };
+
+  const handleUpdatePricing = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await apiService.updateSettings({
+        price_per_million_input_tokens: priceInputTokens,
+        price_per_million_output_tokens: priceOutputTokens,
+        price_per_5s_transcription: priceTranscription,
+        price_per_10k_tts_chars: priceTTS
+      });
+      setSuccess("Pricing updated successfully");
+      await loadSettings();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update pricing");
     }
   };
 
@@ -150,6 +179,55 @@ export default function AdminSettings() {
               </div>
             </div>
             <button type="submit" className="btn btn-primary">Update Temperature</button>
+          </form>
+
+          <form onSubmit={handleUpdatePricing} className="settings-form">
+            <h3>Pricing Configuration</h3>
+            <div className="form-group">
+              <label htmlFor="price-input-tokens">Price per Million Input Tokens ($)</label>
+              <input
+                type="number"
+                id="price-input-tokens"
+                step="0.01"
+                min="0"
+                value={priceInputTokens}
+                onChange={(e) => setPriceInputTokens(parseFloat(e.target.value))}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="price-output-tokens">Price per Million Output Tokens ($)</label>
+              <input
+                type="number"
+                id="price-output-tokens"
+                step="0.01"
+                min="0"
+                value={priceOutputTokens}
+                onChange={(e) => setPriceOutputTokens(parseFloat(e.target.value))}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="price-transcription">Price per 5 Seconds Transcription ($)</label>
+              <input
+                type="number"
+                id="price-transcription"
+                step="0.001"
+                min="0"
+                value={priceTranscription}
+                onChange={(e) => setPriceTranscription(parseFloat(e.target.value))}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="price-tts">Price per 10k TTS Characters ($)</label>
+              <input
+                type="number"
+                id="price-tts"
+                step="0.01"
+                min="0"
+                value={priceTTS}
+                onChange={(e) => setPriceTTS(parseFloat(e.target.value))}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary">Update Pricing</button>
           </form>
         </div>
 

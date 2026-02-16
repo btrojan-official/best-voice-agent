@@ -65,8 +65,9 @@ async def start_call():
         Call information including ID and WebSocket URL
     """
     try:
-        call = await db.create_call()
-        logger.info(f"Started new call: {call.id}")
+        settings = await db.get_settings()
+        call = await db.create_call(model_name=settings.model_name)
+        logger.info(f"Started new call: {call.id} with model {settings.model_name}")
         
         return {
             "call_id": call.id,
@@ -93,6 +94,8 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
     """
     await manager.connect(call_id, websocket)
     
+    websocket_disconnected = False
+    
     try:
         call = await db.get_call(call_id)
         if not call:
@@ -104,6 +107,11 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
             return
         
         settings = await db.get_settings()
+        
+        # Update call with model name
+        call.model_name = settings.model_name
+        await db.update_call(call)
+        
         agent = CustomerSupportAgent(
             model=settings.model_name,
             temperature=settings.temperature,
@@ -141,7 +149,8 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
             })
             
             call.usage_stats.tts_characters += len(greeting)
-            call.cost_stats.tts_cost += len(greeting) * 0.00003
+            # Calculate TTS cost: (chars / 10000) * price_per_10k
+            call.cost_stats.tts_cost += (len(greeting) / 10000) * settings.price_per_10k_tts_chars
             await db.update_call(call)
             
             logger.info(f"Used precomputed greeting for call {call_id}")
@@ -207,7 +216,8 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         call = await db.get_call(call_id)
                         call.usage_stats.input_characters += len(transcription)
                         call.usage_stats.transcription_seconds += len(audio_bytes) / 16000
-                        call.cost_stats.transcription_cost += (len(audio_bytes) / 16000) * 0.006
+                        # Calculate transcription cost: (seconds / 5) * price_per_5s
+                        call.cost_stats.transcription_cost += ((len(audio_bytes) / 16000) / 5) * settings.price_per_5s_transcription
                         await db.update_call(call)
                         
                         # Get random acknowledgment and wait 1 second before sending
@@ -242,7 +252,11 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         
                         # Process message with acknowledgment context
                         response_text = ""
-                        async for chunk in agent.process_message(transcription, ack_data["text"]):
+                        first_chunk_latency_ms = None
+                        async for chunk_data in agent.process_message(transcription, ack_data["text"]):
+                            chunk, latency = chunk_data
+                            if latency is not None:
+                                first_chunk_latency_ms = latency
                             response_text += chunk
                             await websocket.send_json({
                                 "type": "response_chunk",
@@ -264,7 +278,23 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         call = await db.get_call(call_id)
                         call.usage_stats.output_characters += len(response_text)
                         call.usage_stats.llm_calls += 1
-                        call.cost_stats.llm_output_cost += len(response_text) * 0.000015
+                        
+                        # Store latency for this call
+                        if first_chunk_latency_ms:
+                            call.usage_stats.llm_latency_ms = first_chunk_latency_ms
+                        
+                        # Estimate token counts from characters (rough approximation: 1 token ≈ 4 chars)
+                        estimated_output_tokens = len(response_text) // 4
+                        call.usage_stats.output_tokens += estimated_output_tokens
+                        
+                        # Calculate LLM output cost: (tokens / 1M) * price_per_million
+                        call.cost_stats.llm_output_cost += (estimated_output_tokens / 1_000_000) * settings.price_per_million_output_tokens
+                        
+                        # Also add input cost based on input characters
+                        estimated_input_tokens = len(transcription) // 4
+                        call.usage_stats.input_tokens += estimated_input_tokens
+                        call.cost_stats.llm_input_cost += (estimated_input_tokens / 1_000_000) * settings.price_per_million_input_tokens
+                        
                         await db.update_call(call)
                         
                         try:
@@ -276,7 +306,8 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                             
                             call = await db.get_call(call_id)
                             call.usage_stats.tts_characters += len(response_text)
-                            call.cost_stats.tts_cost += len(response_text) * 0.00003
+                            # Calculate TTS cost: (chars / 10000) * price_per_10k
+                            call.cost_stats.tts_cost += (len(response_text) / 10000) * settings.price_per_10k_tts_chars
                             await db.update_call(call)
                         
                         except Exception as e:
@@ -295,14 +326,20 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
             
             except WebSocketDisconnect:
                 logger.info(f"WebSocket disconnected for call {call_id}")
+                websocket_disconnected = True
                 break
             
             except Exception as e:
                 logger.error(f"Error in WebSocket loop: {e}")
-                await websocket.send_json({
-                    "type": "error",
-                    "message": str(e)
-                })
+                try:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": str(e)
+                    })
+                except:
+                    # Websocket already closed
+                    websocket_disconnected = True
+                    break
         
         agent = manager.get_agent(call_id)
         if agent:
@@ -331,12 +368,24 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
         
         await db.update_stats(
             usage_delta=call.usage_stats,
-            cost_delta=call.cost_stats
+            cost_delta=call.cost_stats,
+            model_name=call.model_name,
+            call_tokens=call.usage_stats.input_tokens + call.usage_stats.output_tokens,
+            call_latency_ms=call.usage_stats.llm_latency_ms
         )
+    
+    except WebSocketDisconnect:
+        # User hung up - this is normal, not an error
+        logger.info(f"User hung up call {call_id}")
+        websocket_disconnected = True
     
     except Exception as e:
         logger.error(f"Fatal error in WebSocket: {e}")
-        await db.update_call_status(call_id, CallStatus.ERROR, str(e))
+        # Only mark as ERROR if websocket is still connected (real error, not user hangup)
+        if not websocket_disconnected:
+            await db.update_call_status(call_id, CallStatus.ERROR, str(e))
+        else:
+            logger.info(f"Error occurred after disconnect for call {call_id}, not marking as ERROR")
     
     finally:
         manager.disconnect(call_id)

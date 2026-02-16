@@ -114,6 +114,16 @@ export default function CallDetails() {
               <span>LLM Calls:</span>
               <span>{call.usage_stats.llm_calls}</span>
             </div>
+            {call.usage_stats.llm_latency_ms > 0 && (
+              <div className="stat-row">
+                <span>Avg Latency:</span>
+                <span>{call.usage_stats.llm_latency_ms.toFixed(0)}ms</span>
+              </div>
+            )}
+            <div className="stat-row">
+              <span>Model:</span>
+              <span style={{ fontSize: '0.75rem' }}>{call.model_name}</span>
+            </div>
           </div>
 
           <div className="stats-card">

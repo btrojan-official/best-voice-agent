@@ -21,6 +21,7 @@ export interface UsageStats {
   transcription_seconds: number;
   tts_characters: number;
   llm_calls: number;
+  llm_latency_ms: number;
 }
 
 export interface CostStats {
@@ -50,6 +51,7 @@ export interface Call {
   usage_stats: UsageStats;
   cost_stats: CostStats;
   error_message?: string;
+  model_name: string;
 }
 
 export interface InformationToGather {
@@ -63,6 +65,18 @@ export interface Settings {
   model_name: string;
   temperature: number;
   information_to_gather: InformationToGather[];
+  price_per_million_input_tokens: number;
+  price_per_million_output_tokens: number;
+  price_per_5s_transcription: number;
+  price_per_10k_tts_chars: number;
+}
+
+export interface ModelLatencyStats {
+  model_name: string;
+  total_calls: number;
+  total_tokens: number;
+  total_latency_ms: number;
+  avg_latency_per_100_tokens: number;
 }
 
 export interface SystemStats {
@@ -72,6 +86,7 @@ export interface SystemStats {
   error_calls: number;
   total_usage: UsageStats;
   total_costs: CostStats;
+  model_latencies: Record<string, ModelLatencyStats>;
   last_updated: string;
 }
 
