@@ -139,7 +139,7 @@ export default function AdminSettings() {
                 type="range"
                 id="temperature"
                 min="0"
-                max="2"
+                max="1.0"
                 step="0.1"
                 value={temperature}
                 onChange={(e) => setTemperature(parseFloat(e.target.value))}
