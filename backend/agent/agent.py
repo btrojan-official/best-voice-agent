@@ -41,7 +41,7 @@ class CustomerSupportAgent:
     
     def __init__(
         self,
-        model: str = "openai/gpt-oss-120b",
+        model: str = "moonshotai/kimi-k2-instruct-0905",
         temperature: float = 0.7,
         information_to_gather: Optional[List[Dict[str, str]]] = None
     ):
@@ -52,6 +52,13 @@ class CustomerSupportAgent:
         self.tool_calls: List[Dict[str, Any]] = []
         self.gathered_information: Dict[str, Any] = {}
         self.tools = CustomerSupportTools()
+        
+        # Long-short term memory management
+        self.conversation_summary: Optional[str] = None
+        self.messages_since_last_summary: int = 0
+        self.summary_threshold: int = 20  # Start summarizing after 20 messages
+        self.summary_update_interval: int = 4  # Update summary every 4 messages
+        self.keep_recent_messages: int = 4  # Keep last 4 messages in full
         
         # Determine which provider to use based on model name
         use_groq = self._is_groq_model(model)
@@ -159,8 +166,16 @@ class CustomerSupportAgent:
             if acknowledgment:
                 logger.info(f"With acknowledgment: {acknowledgment}")
             
+            # Update memory management (summarize if needed)
+            await self._update_memory()
+            
+            # Use condensed history for LLM to save tokens and improve context management
+            condensed_history = self._get_condensed_history()
+            
+            logger.info(f"Using {len(condensed_history)} messages (condensed from {len(self.conversation_history)})")
+            
             start_time = time.time()
-            response_stream = await self.llm.astream_chat(self.conversation_history)
+            response_stream = await self.llm.astream_chat(condensed_history)
             
             full_response = ""
             chunk_count = 0
@@ -193,6 +208,9 @@ class CustomerSupportAgent:
             self.conversation_history.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content=full_response)
             )
+            
+            # Track messages since last summary update
+            self.messages_since_last_summary += 2  # User message + assistant response
             
             # Send final marker with total latency
             yield "", None, total_latency_ms
@@ -229,6 +247,102 @@ class CustomerSupportAgent:
         except Exception as e:
             logger.error(f"Error generating summary: {e}")
             return "Error generating summary"
+    
+    async def _generate_conversation_summary(self) -> str:
+        """
+        Generate a running summary of the conversation for long-short term memory.
+        This is called when conversation exceeds threshold or needs updating.
+        
+        Returns:
+            Summary of the conversation context
+        """
+        try:
+            # Get messages excluding system and recent ones
+            messages_to_summarize = self.conversation_history[1:-self.keep_recent_messages]  # Skip system prompt
+            
+            if not messages_to_summarize:
+                return ""
+            
+            # If we already have a summary, include it in the context
+            summary_prompt = ""
+            if self.conversation_summary:
+                summary_prompt = f"Previous conversation summary:\n{self.conversation_summary}\n\nContinuation of the conversation:\n"
+            else:
+                summary_prompt = "Conversation to summarize:\n"
+            
+            conversation_text = "\n".join([
+                f"{msg.role.value}: {msg.content}"
+                for msg in messages_to_summarize
+                if msg.role != MessageRole.SYSTEM
+            ])
+            
+            prompt = f"""{summary_prompt}{conversation_text}
+
+Please provide a concise summary of the key points, customer issues, and resolution status from the above conversation. Focus on actionable information and important context."""
+            
+            response = await self.llm.acomplete(prompt)
+            summary = response.text.strip()
+            
+            logger.info(f"Generated running conversation summary ({len(messages_to_summarize)} messages)")
+            return summary
+        
+        except Exception as e:
+            logger.error(f"Error generating running summary: {e}")
+            return self.conversation_summary or ""
+    
+    def _get_condensed_history(self) -> List[ChatMessage]:
+        """
+        Get condensed conversation history using long-short term memory.
+        Returns: system prompt + summary message + last N messages
+        
+        Returns:
+            Condensed list of ChatMessages
+        """
+        # Always include system prompt
+        condensed = [self.conversation_history[0]]
+        
+        # If we have a summary, add it as a system-like message
+        if self.conversation_summary:
+            condensed.append(
+                ChatMessage(
+                    role=MessageRole.SYSTEM, 
+                    content=f"[Previous conversation summary: {self.conversation_summary}]"
+                )
+            )
+        
+        # Add recent messages
+        if len(self.conversation_history) > 1:
+            recent_messages = self.conversation_history[-self.keep_recent_messages:]
+            condensed.extend(recent_messages)
+        
+        return condensed
+    
+    async def _update_memory(self) -> None:
+        """
+        Update long-short term memory if needed.
+        Checks if summary needs to be created or updated based on message count.
+        """
+        # Count actual conversation messages (user + assistant only)
+        non_system_count = len([
+            msg for msg in self.conversation_history
+            if msg.role in [MessageRole.USER, MessageRole.ASSISTANT]
+        ])
+        
+        # Check if we need to create or update summary
+        should_summarize = False
+        
+        if non_system_count >= self.summary_threshold and self.conversation_summary is None:
+            # First time reaching threshold - create initial summary
+            should_summarize = True
+            logger.info(f"Reached {non_system_count} messages, creating initial summary")
+        elif self.conversation_summary is not None and self.messages_since_last_summary >= self.summary_update_interval:
+            # Update existing summary
+            should_summarize = True
+            logger.info(f"Updating summary after {self.messages_since_last_summary} new messages")
+        
+        if should_summarize:
+            self.conversation_summary = await self._generate_conversation_summary()
+            self.messages_since_last_summary = 0
     
     async def generate_call_title(self) -> str:
         """
@@ -271,6 +385,15 @@ class CustomerSupportAgent:
             for msg in self.conversation_history
             if msg.role != MessageRole.SYSTEM
         ]
+    
+    def get_conversation_summary(self) -> Optional[str]:
+        """
+        Get the current running conversation summary for long-short term memory.
+        
+        Returns:
+            Current conversation summary or None
+        """
+        return self.conversation_summary
     
     def get_stats(self) -> Dict[str, Any]:
         """

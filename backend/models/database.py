@@ -36,7 +36,7 @@ class Database:
             self._write_json(self.calls_file, [])
         
         if not self.settings_file.exists():
-            default_model = os.getenv("DEFAULT_MODEL", "openai/gpt-oss-120b")
+            default_model = os.getenv("DEFAULT_MODEL", "moonshotai/kimi-k2-instruct-0905")
             default_token_length = int(os.getenv("ESTIMATED_TOKEN_LENGTH", "4"))
             default_settings = Settings(
                 model_name=default_model,
@@ -82,7 +82,7 @@ class Database:
         with open(file_path, 'w') as f:
             json.dump(data, f, indent=2)
     
-    async def create_call(self, model_name: str = "openai/gpt-oss-120b") -> Call:
+    async def create_call(self, model_name: str = "moonshotai/kimi-k2-instruct-0905") -> Call:
         """Create a new call."""
         async with self.lock:
             call = Call(
