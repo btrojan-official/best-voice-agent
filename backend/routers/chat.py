@@ -299,6 +299,11 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         call.usage_stats.input_tokens += estimated_input_tokens
                         call.cost_stats.llm_input_cost += (estimated_input_tokens / 1_000_000) * settings.price_per_million_input_tokens
                         
+                        # Update conversation summary if available (for long-short term memory)
+                        conversation_summary = agent.get_conversation_summary()
+                        if conversation_summary:
+                            call.conversation_summary = conversation_summary
+                        
                         await db.update_call(call)
                         
                         try:

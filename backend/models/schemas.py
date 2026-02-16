@@ -58,6 +58,7 @@ class Call(BaseModel):
     messages: List[Message] = Field(default_factory=list)
     tool_calls: List[ToolCall] = Field(default_factory=list)
     summary: Optional[str] = None
+    conversation_summary: Optional[str] = None  # Running summary for long-short term memory
     usage_stats: UsageStats = Field(default_factory=UsageStats)
     cost_stats: CostStats = Field(default_factory=CostStats)
     error_message: Optional[str] = None
