@@ -16,6 +16,17 @@ export default function CallDetails() {
     }
   }, [callId]);
 
+  // Auto-refresh for pending calls every 2 seconds
+  useEffect(() => {
+    if (!callId || !call || call.status !== "pending") return;
+
+    const interval = setInterval(() => {
+      loadCall();
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [callId, call?.status]);
+
   const loadCall = async () => {
     if (!callId) return;
     
@@ -27,7 +38,10 @@ export default function CallDetails() {
       setError(err instanceof Error ? err.message : "Failed to load call");
       console.error("Error loading call:", err);
     } finally {
-      setLoading(false);
+      // Only set loading to false after the first load
+      if (loading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -57,7 +71,12 @@ export default function CallDetails() {
       <div className="page-header">
         <div>
           <Link to="/admin/calls" className="back-link">← Back to Calls</Link>
-          <h1>{call.title}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <h1>{call.title}</h1>
+            {call.status === "pending" && (
+              <span className="live-indicator">● LIVE</span>
+            )}
+          </div>
         </div>
       </div>
 
