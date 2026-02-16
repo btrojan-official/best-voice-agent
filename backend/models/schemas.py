@@ -61,7 +61,7 @@ class Call(BaseModel):
     usage_stats: UsageStats = Field(default_factory=UsageStats)
     cost_stats: CostStats = Field(default_factory=CostStats)
     error_message: Optional[str] = None
-    model_name: str = "anthropic/claude-3.5-sonnet"  # Track which model was used
+    model_name: str = "openai/gpt-oss-120b"  # Track which model was used
 
 
 class InformationToGather(BaseModel):
@@ -72,7 +72,7 @@ class InformationToGather(BaseModel):
 
 
 class Settings(BaseModel):
-    model_name: str = "anthropic/claude-3.5-sonnet"
+    model_name: str = "openai/gpt-oss-120b"
     temperature: float = 0.7
     information_to_gather: List[InformationToGather] = Field(default_factory=list)
     # Pricing configuration

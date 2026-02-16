@@ -9,6 +9,7 @@ import logging
 from llama_index.core import Settings
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.llms.openrouter import OpenRouter
+from llama_index.llms.groq import Groq
 
 from .prompts import SYSTEM_PROMPT, GREETING_PROMPT, SUMMARY_PROMPT, CALL_TITLE_PROMPT
 from .tools import CustomerSupportTools, get_available_tools
@@ -19,12 +20,28 @@ logger = logging.getLogger(__name__)
 class CustomerSupportAgent:
     """
     Async customer support agent optimized for real-time voice conversations.
-    Uses LlamaIndex with OpenRouter for low-latency streaming responses.
+    Supports both OpenRouter and Groq for low-latency streaming responses.
     """
+    
+    # Known Groq models for auto-detection
+    GROQ_MODELS = {
+        "llama-3.3-70b-versatile",
+        "moonshotai/kimi-k2-instruct-0905",
+        "llama-3.1-70b-versatile",
+        "llama-3.1-8b-instant",
+        "llama-3.2-1b-preview",
+        "llama-3.2-3b-preview",
+        "llama-3.2-11b-vision-preview",
+        "llama-3.2-90b-vision-preview",
+        "mixtral-8x7b-32768",
+        "gemma-7b-it",
+        "gemma2-9b-it",
+        "openai/gpt-oss-120b",
+    }
     
     def __init__(
         self,
-        model: str = "anthropic/claude-3.5-sonnet",
+        model: str = "openai/gpt-oss-120b",
         temperature: float = 0.7,
         information_to_gather: Optional[List[Dict[str, str]]] = None
     ):
@@ -36,16 +53,33 @@ class CustomerSupportAgent:
         self.gathered_information: Dict[str, Any] = {}
         self.tools = CustomerSupportTools()
         
-        api_key = os.getenv("OPENROUTER_API_KEY")
-        if not api_key:
-            raise ValueError("OPENROUTER_API_KEY not found in environment variables")
+        # Determine which provider to use based on model name
+        use_groq = self._is_groq_model(model)
         
-        self.llm = OpenRouter(
-            model=model,
-            api_key=api_key,
-            temperature=temperature,
-            max_tokens=512
-        )
+        if use_groq:
+            api_key = os.getenv("GROQ_API_KEY")
+            if not api_key:
+                raise ValueError("GROQ_API_KEY not found in environment variables")
+            
+            self.llm = Groq(
+                model=model,
+                api_key=api_key,
+                temperature=temperature,
+                max_tokens=512
+            )
+            logger.info(f"Initialized Groq LLM with model: {model}")
+        else:
+            api_key = os.getenv("OPENROUTER_API_KEY")
+            if not api_key:
+                raise ValueError("OPENROUTER_API_KEY not found in environment variables")
+            
+            self.llm = OpenRouter(
+                model=model,
+                api_key=api_key,
+                temperature=temperature,
+                max_tokens=512
+            )
+            logger.info(f"Initialized OpenRouter LLM with model: {model}")
         
         Settings.llm = self.llm
         
@@ -58,6 +92,18 @@ class CustomerSupportAgent:
         self.conversation_history.append(
             ChatMessage(role=MessageRole.SYSTEM, content=system_prompt)
         )
+    
+    def _is_groq_model(self, model: str) -> bool:
+        """
+        Determine if the model should use Groq provider.
+        
+        Args:
+            model: Model name
+            
+        Returns:
+            True if model should use Groq, False for OpenRouter
+        """
+        return model in self.GROQ_MODELS
     
     async def get_greeting(self) -> str:
         """

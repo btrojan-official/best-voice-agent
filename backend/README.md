@@ -15,11 +15,13 @@ cp .env.example .env
 ```
 
 3. Edit `.env` with your API keys:
-   - OPENROUTER_API_KEY: Get from https://openrouter.ai/
-   - OPENROUTER_MODEL: Model to use (default: anthropic/claude-3.5-sonnet)
+   - OPENROUTER_API_KEY: Get from https://openrouter.ai/ (required for OpenRouter models)
+   - GROQ_API_KEY: Get from https://groq.com/ (required for Groq models)
+   - DEFAULT_MODEL: Model to use (default: openai/gpt-oss-120b)
+     - Groq models: openai/gpt-oss-120b, llama-3.3-70b-versatile, llama-3.1-70b-versatile
+     - OpenRouter models: anthropic/claude-3.5-sonnet, google/gemini-pro-1.5, etc.
    - ELEVENLABS_API_KEY: Get from https://elevenlabs.io/
-   - GROQ_API_KEY: Get from https://groq.com/
-   - GROQ_MODEL: Whisper model to use (default: whisper-large-v3)
+   - GROQ_MODEL: Whisper model for transcription (default: whisper-large-v3)
    - ADMIN_USERNAME and ADMIN_PASSWORD: For admin panel access
 
 4. Test API connections (recommended):
