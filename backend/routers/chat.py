@@ -304,6 +304,11 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         if conversation_summary:
                             call.conversation_summary = conversation_summary
                         
+                        # Update gathered information from agent
+                        gathered_info = agent.get_gathered_information()
+                        if gathered_info:
+                            call.gathered_information = gathered_info
+                        
                         await db.update_call(call)
                         
                         try:

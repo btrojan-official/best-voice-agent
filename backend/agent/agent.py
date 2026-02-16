@@ -50,7 +50,6 @@ class CustomerSupportAgent:
         self.information_to_gather = information_to_gather or []
         self.conversation_history: List[ChatMessage] = []
         self.tool_calls: List[Dict[str, Any]] = []
-        self.gathered_information: Dict[str, Any] = {}
         self.tools = CustomerSupportTools()
         
         # Long-short term memory management
@@ -89,15 +88,40 @@ class CustomerSupportAgent:
         
         Settings.llm = self.llm
         
+        # Build system prompt with information to gather and current status
+        self._update_system_prompt()
+    
+    def _update_system_prompt(self):
+        """Update the system prompt with current gathered data status."""
         info_text = "\n".join([
             f"- {item['title']}: {item['description']}"
             for item in self.information_to_gather
-        ]) if self.information_to_gather else "- Understand customer's needs and issues"
+        ]) if self.information_to_gather else "- order_id, customer_name, customer_surname, issue_type, issue_description"
         
-        system_prompt = SYSTEM_PROMPT.format(information_to_gather=info_text)
-        self.conversation_history.append(
-            ChatMessage(role=MessageRole.SYSTEM, content=system_prompt)
+        # Build gathered data status
+        gathered_data = self.tools.get_gathered_information()
+        if gathered_data:
+            status_lines = []
+            for field in self.information_to_gather:
+                field_title = field['title']
+                if field_title in gathered_data:
+                    status_lines.append(f"✓ {field_title}: {gathered_data[field_title]}")
+                else:
+                    status_lines.append(f"✗ {field_title}: NOT YET GATHERED")
+            gathered_data_status = "\n".join(status_lines)
+        else:
+            gathered_data_status = "No data gathered yet. Start gathering information from the customer."
+        
+        system_prompt = SYSTEM_PROMPT.format(
+            information_to_gather=info_text,
+            gathered_data_status=gathered_data_status
         )
+        
+        # Update or add system prompt
+        if self.conversation_history and self.conversation_history[0].role == MessageRole.SYSTEM:
+            self.conversation_history[0] = ChatMessage(role=MessageRole.SYSTEM, content=system_prompt)
+        else:
+            self.conversation_history.insert(0, ChatMessage(role=MessageRole.SYSTEM, content=system_prompt))
     
     def _is_groq_model(self, model: str) -> bool:
         """
@@ -168,35 +192,82 @@ class CustomerSupportAgent:
             # Update memory management (summarize if needed)
             await self._update_memory()
             
+            # Update system prompt with current gathered data status
+            self._update_system_prompt()
+            
             # Use condensed history for LLM to save tokens
             history_to_use = self._get_condensed_history()
             logger.info(f"Using {len(history_to_use)} messages (condensed from {len(self.conversation_history)})")
             
             start_time = time.time()
-            response_stream = await self.llm.astream_chat(history_to_use)
             
-            full_response = ""
-            chunk_count = 0
-            first_chunk_time = None
-            
-            async for chunk in response_stream:
-                if chunk.delta:
-                    if first_chunk_time is None:
-                        first_chunk_time = time.time()
-                    full_response += chunk.delta
-                    chunk_count += 1
-                    # Only send first chunk latency with first chunk
-                    if chunk_count == 1 and first_chunk_time:
-                        yield chunk.delta, (first_chunk_time - start_time) * 1000, None
-                    else:
-                        yield chunk.delta, None, None
+            # Use chat with tools for function calling
+            try:
+                response = await self.llm.achat(
+                    messages=history_to_use,
+                    tools=get_available_tools()
+                )
+                
+                # Check if model wants to call a tool
+                tool_calls_made = []
+                if hasattr(response, 'message') and hasattr(response.message, 'additional_kwargs'):
+                    tool_calls = response.message.additional_kwargs.get('tool_calls', [])
+                    
+                    for tool_call in tool_calls:
+                        if tool_call.get('type') == 'function':
+                            function_name = tool_call['function']['name']
+                            function_args = json.loads(tool_call['function']['arguments'])
+                            
+                            logger.info(f"Tool call: {function_name} with args: {function_args}")
+                            
+                            # Execute the tool
+                            if function_name == "save_gathered_data":
+                                result = self.tools.save_gathered_data(function_args.get('data_fields', {}))
+                                tool_calls_made.append({
+                                    "tool": function_name,
+                                    "args": function_args,
+                                    "result": result,
+                                    "timestamp": datetime.now().isoformat()
+                                })
+                                self.tool_calls.append(tool_calls_made[-1])
+                
+                # Get the text response (tools are called but response continues)
+                full_response = response.message.content if hasattr(response, 'message') else str(response)
+                
+            except Exception as e:
+                logger.warning(f"Tool calling not supported or error: {e}, falling back to streaming")
+                # Fallback to streaming without tools
+                response_stream = await self.llm.astream_chat(history_to_use)
+                
+                full_response = ""
+                chunk_count = 0
+                first_chunk_time = None
+                
+                async for chunk in response_stream:
+                    if chunk.delta:
+                        if first_chunk_time is None:
+                            first_chunk_time = time.time()
+                        full_response += chunk.delta
+                        chunk_count += 1
+                        # Only send first chunk latency with first chunk
+                        if chunk_count == 1 and first_chunk_time:
+                            yield chunk.delta, (first_chunk_time - start_time) * 1000, None
+                        else:
+                            yield chunk.delta, None, None
             
             end_time = time.time()
             total_latency_ms = (end_time - start_time) * 1000
             
-            # Log the complete response received from OpenRouter
-            logger.info(f"OpenRouter Response - {chunk_count} chunks in {total_latency_ms:.0f}ms")
+            # If we used achat (non-streaming), yield the full response at once
+            if full_response:
+                first_chunk_latency_ms = total_latency_ms
+                yield full_response, first_chunk_latency_ms, None
+            
+            # Log the complete response
+            logger.info(f"Response generated in {total_latency_ms:.0f}ms")
             logger.info(f"Full output: {full_response}")
+            if tool_calls_made:
+                logger.info(f"Tool calls made: {len(tool_calls_made)}")
             
             # Update the last assistant message with full response
             # Remove the acknowledgment-only message if it exists
@@ -427,3 +498,12 @@ Please provide a concise summary of the key points, customer issues, and resolut
             "total_characters": total_chars,
             "tool_calls": len(self.tool_calls)
         }
+    
+    def get_gathered_information(self) -> Dict[str, str]:
+        """
+        Get all gathered information from customer.
+        
+        Returns:
+            Dictionary of gathered information
+        """
+        return self.tools.get_gathered_information()
