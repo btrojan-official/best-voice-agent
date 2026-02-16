@@ -58,11 +58,10 @@ class Call(BaseModel):
     messages: List[Message] = Field(default_factory=list)
     tool_calls: List[ToolCall] = Field(default_factory=list)
     summary: Optional[str] = None
-    conversation_summary: Optional[str] = None  # Running summary for long-short term memory
     usage_stats: UsageStats = Field(default_factory=UsageStats)
     cost_stats: CostStats = Field(default_factory=CostStats)
     error_message: Optional[str] = None
-    model_name: str = "moonshotai/kimi-k2-instruct-0905"  # Track which model was used
+    model_name: str = "openai/gpt-oss-120b"  # Track which model was used
 
 
 class InformationToGather(BaseModel):
@@ -73,7 +72,7 @@ class InformationToGather(BaseModel):
 
 
 class Settings(BaseModel):
-    model_name: str = "moonshotai/kimi-k2-instruct-0905"
+    model_name: str = "openai/gpt-oss-120b"
     temperature: float = 0.7
     information_to_gather: List[InformationToGather] = Field(default_factory=list)
     # Pricing configuration
