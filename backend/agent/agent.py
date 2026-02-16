@@ -85,7 +85,7 @@ class CustomerSupportAgent:
             )
             return fallback
     
-    async def process_message(self, user_message: str, acknowledgment: Optional[str] = None) -> AsyncGenerator[Tuple[str, Optional[float]], None]:
+    async def process_message(self, user_message: str, acknowledgment: Optional[str] = None) -> AsyncGenerator[Tuple[str, Optional[float], Optional[float]], None]:
         """
         Process user message and stream response.
         
@@ -94,7 +94,9 @@ class CustomerSupportAgent:
             acknowledgment: Optional acknowledgment phrase that was played (e.g., "Hmm...")
         
         Yields:
-            Tuple of (response text chunk, latency_ms) - latency only on first chunk
+            Tuple of (response text chunk, first_chunk_latency_ms, total_latency_ms)
+            - first_chunk_latency_ms: only returned on first chunk (time to first token)
+            - total_latency_ms: only returned on last chunk (total generation time)
         """
         try:
             self.conversation_history.append(
@@ -124,11 +126,11 @@ class CustomerSupportAgent:
                         first_chunk_time = time.time()
                     full_response += chunk.delta
                     chunk_count += 1
-                    # Only send latency with first chunk
+                    # Only send first chunk latency with first chunk
                     if chunk_count == 1 and first_chunk_time:
-                        yield chunk.delta, (first_chunk_time - start_time) * 1000
+                        yield chunk.delta, (first_chunk_time - start_time) * 1000, None
                     else:
-                        yield chunk.delta, None
+                        yield chunk.delta, None, None
             
             end_time = time.time()
             total_latency_ms = (end_time - start_time) * 1000
@@ -145,6 +147,9 @@ class CustomerSupportAgent:
             self.conversation_history.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content=full_response)
             )
+            
+            # Send final marker with total latency
+            yield "", None, total_latency_ms
         
         except Exception as e:
             logger.error(f"Error processing message: {e}")
@@ -152,7 +157,7 @@ class CustomerSupportAgent:
             self.conversation_history.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content=error_response)
             )
-            yield error_response, None
+            yield error_response, None, None
     
     async def generate_summary(self) -> str:
         """

@@ -69,6 +69,7 @@ export interface Settings {
   price_per_million_output_tokens: number;
   price_per_5s_transcription: number;
   price_per_10k_tts_chars: number;
+  estimated_token_length: number;
 }
 
 export interface ModelLatencyStats {

@@ -31,7 +31,7 @@ class UsageStats(BaseModel):
     transcription_seconds: float = 0.0
     tts_characters: int = 0
     llm_calls: int = 0
-    llm_latency_ms: float = 0.0  # Average latency in milliseconds
+    llm_latency_ms: float = 0.0  # Total latency for all LLM calls in milliseconds
 
 
 class CostStats(BaseModel):
@@ -80,6 +80,8 @@ class Settings(BaseModel):
     price_per_million_output_tokens: float = 15.0  # $ per 1M output tokens
     price_per_5s_transcription: float = 0.03  # $ per 5 seconds
     price_per_10k_tts_chars: float = 0.30  # $ per 10k characters
+    # Token estimation
+    estimated_token_length: int = 4  # Average characters per token (default: 4)
 
 
 class ModelLatencyStats(BaseModel):

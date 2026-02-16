@@ -19,6 +19,7 @@ export default function AdminSettings() {
   const [priceOutputTokens, setPriceOutputTokens] = useState(15.0);
   const [priceTranscription, setPriceTranscription] = useState(0.03);
   const [priceTTS, setPriceTTS] = useState(0.30);
+  const [estimatedTokenLength, setEstimatedTokenLength] = useState(4);
 
   useEffect(() => {
     loadSettings();
@@ -34,6 +35,7 @@ export default function AdminSettings() {
       setPriceOutputTokens(data.price_per_million_output_tokens);
       setPriceTranscription(data.price_per_5s_transcription);
       setPriceTTS(data.price_per_10k_tts_chars);
+      setEstimatedTokenLength(data.estimated_token_length);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load settings");
@@ -81,7 +83,8 @@ export default function AdminSettings() {
         price_per_million_input_tokens: priceInputTokens,
         price_per_million_output_tokens: priceOutputTokens,
         price_per_5s_transcription: priceTranscription,
-        price_per_10k_tts_chars: priceTTS
+        price_per_10k_tts_chars: priceTTS,
+        estimated_token_length: estimatedTokenLength
       });
       setSuccess("Pricing updated successfully");
       await loadSettings();
@@ -226,6 +229,21 @@ export default function AdminSettings() {
                 value={priceTTS}
                 onChange={(e) => setPriceTTS(parseFloat(e.target.value))}
               />
+            </div>
+            <div className="form-group">
+              <label htmlFor="estimated-token-length">Estimated Token Length (chars per token)</label>
+              <input
+                type="number"
+                id="estimated-token-length"
+                step="1"
+                min="1"
+                max="10"
+                value={estimatedTokenLength}
+                onChange={(e) => setEstimatedTokenLength(parseInt(e.target.value))}
+              />
+              <div className="hint-text" style={{ fontSize: '0.813rem', color: '#666', marginTop: '0.25rem' }}>
+                Average characters per token. Default is 4 (1 token ≈ 0.75 words)
+              </div>
             </div>
             <button type="submit" className="btn btn-primary">Update Pricing</button>
           </form>

@@ -37,6 +37,7 @@ class Database:
         
         if not self.settings_file.exists():
             default_model = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+            default_token_length = int(os.getenv("ESTIMATED_TOKEN_LENGTH", "4"))
             default_settings = Settings(
                 model_name=default_model,
                 temperature=0.7,
@@ -44,6 +45,7 @@ class Database:
                 price_per_million_output_tokens=15.0,
                 price_per_5s_transcription=0.03,
                 price_per_10k_tts_chars=0.30,
+                estimated_token_length=default_token_length,
                 information_to_gather=[
                     InformationToGather(
                         id=str(uuid.uuid4()),

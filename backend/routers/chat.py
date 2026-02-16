@@ -253,15 +253,19 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         # Process message with acknowledgment context
                         response_text = ""
                         first_chunk_latency_ms = None
+                        total_latency_ms = None
                         async for chunk_data in agent.process_message(transcription, ack_data["text"]):
-                            chunk, latency = chunk_data
-                            if latency is not None:
-                                first_chunk_latency_ms = latency
-                            response_text += chunk
-                            await websocket.send_json({
-                                "type": "response_chunk",
-                                "text": chunk
-                            })
+                            chunk, first_latency, total_latency = chunk_data
+                            if first_latency is not None:
+                                first_chunk_latency_ms = first_latency
+                            if total_latency is not None:
+                                total_latency_ms = total_latency
+                            if chunk:  # Only send non-empty chunks
+                                response_text += chunk
+                                await websocket.send_json({
+                                    "type": "response_chunk",
+                                    "text": chunk
+                                })
                         
                         await websocket.send_json({
                             "type": "response",
@@ -279,19 +283,19 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         call.usage_stats.output_characters += len(response_text)
                         call.usage_stats.llm_calls += 1
                         
-                        # Store latency for this call
-                        if first_chunk_latency_ms:
-                            call.usage_stats.llm_latency_ms = first_chunk_latency_ms
+                        # Store latency for this call (use total latency for better accuracy)
+                        if total_latency_ms:
+                            call.usage_stats.llm_latency_ms += total_latency_ms
                         
-                        # Estimate token counts from characters (rough approximation: 1 token ≈ 4 chars)
-                        estimated_output_tokens = len(response_text) // 4
+                        # Use configured token estimation
+                        estimated_output_tokens = len(response_text) // settings.estimated_token_length
                         call.usage_stats.output_tokens += estimated_output_tokens
                         
                         # Calculate LLM output cost: (tokens / 1M) * price_per_million
                         call.cost_stats.llm_output_cost += (estimated_output_tokens / 1_000_000) * settings.price_per_million_output_tokens
                         
                         # Also add input cost based on input characters
-                        estimated_input_tokens = len(transcription) // 4
+                        estimated_input_tokens = len(transcription) // settings.estimated_token_length
                         call.usage_stats.input_tokens += estimated_input_tokens
                         call.cost_stats.llm_input_cost += (estimated_input_tokens / 1_000_000) * settings.price_per_million_input_tokens
                         
