@@ -145,8 +145,8 @@ export default function AdminSettings() {
                 onChange={(e) => setTemperature(parseFloat(e.target.value))}
               />
               <div className="range-labels">
-                <span>Conservative (0)</span>
-                <span>Creative (2)</span>
+                <span>Conservative (0.0)</span>
+                <span>Creative (1.0)</span>
               </div>
             </div>
             <button type="submit" className="btn btn-primary">Update Temperature</button>
