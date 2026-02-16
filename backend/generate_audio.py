@@ -34,7 +34,6 @@ async def generate_acknowledgments():
     acknowledgments = [
         "Let me think...",
         "Okay...",
-        "Interesting...",
         "I see...",
         "Alright...",
         "Got it...",

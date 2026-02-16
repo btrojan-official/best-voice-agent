@@ -18,11 +18,8 @@ class PrecomputedAudioManager:
         self.audio_dir = Path(audio_dir)
         self.audio_cache: Dict[str, bytes] = {}
         self.acknowledgments: List[Dict[str, str]] = [
-            {"text": "Hmm...", "file": "hmm.mp3"},
             {"text": "Let me think...", "file": "let_me_think.mp3"},
             {"text": "Okay...", "file": "okay.mp3"},
-            {"text": "Interesting...", "file": "interesting.mp3"},
-            {"text": "Yhmm...", "file": "yhmm.mp3"},
             {"text": "I see...", "file": "i_see.mp3"},
             {"text": "Alright...", "file": "alright.mp3"},
             {"text": "Got it...", "file": "got_it.mp3"},
