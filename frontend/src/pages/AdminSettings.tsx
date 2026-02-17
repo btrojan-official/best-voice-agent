@@ -191,8 +191,9 @@ export default function AdminSettings() {
               <input
                 type="number"
                 id="price-input-tokens"
-                step="0.01"
+                step="0.2"
                 min="0"
+                max="100"
                 value={priceInputTokens}
                 onChange={(e) => setPriceInputTokens(parseFloat(e.target.value))}
               />
@@ -202,8 +203,9 @@ export default function AdminSettings() {
               <input
                 type="number"
                 id="price-output-tokens"
-                step="0.01"
+                step="0.1"
                 min="0"
+                max="100"
                 value={priceOutputTokens}
                 onChange={(e) => setPriceOutputTokens(parseFloat(e.target.value))}
               />
@@ -213,8 +215,9 @@ export default function AdminSettings() {
               <input
                 type="number"
                 id="price-transcription"
-                step="0.001"
+                step="0.2"
                 min="0"
+                max="100"
                 value={priceTranscription}
                 onChange={(e) => setPriceTranscription(parseFloat(e.target.value))}
               />
@@ -224,8 +227,9 @@ export default function AdminSettings() {
               <input
                 type="number"
                 id="price-tts"
-                step="0.01"
+                step="0.2"
                 min="0"
+                max="100"
                 value={priceTTS}
                 onChange={(e) => setPriceTTS(parseFloat(e.target.value))}
               />
