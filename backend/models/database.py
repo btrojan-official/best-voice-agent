@@ -49,20 +49,32 @@ class Database:
                 information_to_gather=[
                     InformationToGather(
                         id=str(uuid.uuid4()),
-                        title="Customer Identification",
-                        description="Verify the customer's full name and contact information for security purposes",
+                        title="order_id",
+                        description="The customer order ID or reference number related to their inquiry - usually a combination of letters and numbers",
                         created_at=datetime.now().isoformat()
                     ),
                     InformationToGather(
                         id=str(uuid.uuid4()),
-                        title="Order Number",
-                        description="Ask for the order number or reference ID related to their inquiry",
+                        title="customer_name",
+                        description="Ask for the customer's full name (first and last names) for identification purposes.",
                         created_at=datetime.now().isoformat()
                     ),
                     InformationToGather(
                         id=str(uuid.uuid4()),
-                        title="Purchase Date",
+                        title="purchase_date",
                         description="Determine when the customer made their purchase or when the issue occurred",
+                        created_at=datetime.now().isoformat()
+                    ),
+                    InformationToGather(
+                        id=str(uuid.uuid4()),
+                        title="issue_type",
+                        description="Determine the type of issue the customer is experiencing (one of: delayed_delivery, incorrect_item, damaged_item, billing_discrepancy, order_change)",
+                        created_at=datetime.now().isoformat()
+                    ),
+                    InformationToGather(
+                        id=str(uuid.uuid4()),
+                        title="issue_description",
+                        description="Describe the specific issue the customer is experiencing - usually mentioned at the beginning of the conversation",
                         created_at=datetime.now().isoformat()
                     )
                 ]
