@@ -12,7 +12,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "whisper-large-v3")
+TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "whisper-large-v3")
 
 
 async def transcribe_audio_stream(audio_bytes: bytes) -> Optional[str]:
@@ -47,7 +47,7 @@ async def transcribe_audio_stream(audio_bytes: bytes) -> Optional[str]:
             with open(temp_path, "rb") as audio_file:
                 files = {
                     "file": audio_file,
-                    "model": (None, GROQ_MODEL)
+                    "model": (None, TRANSCRIPTION_MODEL)
                 }
                 
                 response = requests.post(url, headers=headers, files=files, timeout=10)

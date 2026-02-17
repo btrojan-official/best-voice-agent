@@ -19,7 +19,7 @@ OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "whisper-large-v3")
+TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "whisper-large-v3")
 
 
 def print_header(text):
@@ -142,7 +142,7 @@ def test_groq():
         print_result(False, "GROQ_API_KEY not configured in .env")
         return False
     
-    print(f"Using model: {GROQ_MODEL}")
+    print(f"Using model: {TRANSCRIPTION_MODEL}")
     print("Creating test audio file...")
     
     try:
@@ -172,7 +172,7 @@ def test_groq():
         with open(temp_path, "rb") as audio_file:
             files = {
                 "file": ("test.wav", audio_file, "audio/wav"),
-                "model": (None, GROQ_MODEL)
+                "model": (None, TRANSCRIPTION_MODEL)
             }
             
             response = requests.post(url, headers=headers, files=files, timeout=30)

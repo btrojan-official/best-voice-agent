@@ -21,7 +21,7 @@ cp .env.example .env
      - Groq models: moonshotai/kimi-k2-instruct-0905, llama-3.3-70b-versatile, llama-3.1-70b-versatile
      - OpenRouter models: anthropic/claude-3.5-sonnet, google/gemini-pro-1.5, etc.
    - ELEVENLABS_API_KEY: Get from https://elevenlabs.io/
-   - GROQ_MODEL: Whisper model for transcription (default: whisper-large-v3)
+   - TRANSCRIPTION_MODEL: Whisper model for transcription (default: whisper-large-v3)
    - ADMIN_USERNAME and ADMIN_PASSWORD: For admin panel access
 
 4. Test API connections (recommended):

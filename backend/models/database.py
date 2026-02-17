@@ -36,11 +36,11 @@ class Database:
             self._write_json(self.calls_file, [])
         
         if not self.settings_file.exists():
-            default_model = os.getenv("DEFAULT_MODEL", "moonshotai/kimi-k2-instruct-0905")
+            default_model = os.getenv("DEFAULT_MODEL", "openai/gpt-oss-120b")
             default_token_length = int(os.getenv("ESTIMATED_TOKEN_LENGTH", "4"))
             default_settings = Settings(
                 model_name=default_model,
-                temperature=0.7,
+                temperature=0.3,
                 price_per_million_input_tokens=3.0,
                 price_per_million_output_tokens=15.0,
                 price_per_5s_transcription=0.03,
