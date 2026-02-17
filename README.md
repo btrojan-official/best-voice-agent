@@ -47,6 +47,14 @@ docker-compose down -v     # stop + delete data
 
 ---
 
+![Admin Dashboard](imgs/1.png)
+![Conversation Info](imgs/5.png)
+![Statistics](imgs/2.png)
+![Settings](imgs/3.png)
+![Chat Interface](imgs/4.png)
+
+---
+
 ## 📁 Project Structure
 
 ```
