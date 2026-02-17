@@ -191,7 +191,7 @@ export default function AdminSettings() {
               <input
                 type="number"
                 id="price-input-tokens"
-                step="0.2"
+                step="0.01"
                 min="0"
                 max="100"
                 value={priceInputTokens}
@@ -203,7 +203,7 @@ export default function AdminSettings() {
               <input
                 type="number"
                 id="price-output-tokens"
-                step="0.1"
+                step="0.01"
                 min="0"
                 max="100"
                 value={priceOutputTokens}
@@ -215,7 +215,7 @@ export default function AdminSettings() {
               <input
                 type="number"
                 id="price-transcription"
-                step="0.2"
+                step="0.01"
                 min="0"
                 max="100"
                 value={priceTranscription}
@@ -227,7 +227,7 @@ export default function AdminSettings() {
               <input
                 type="number"
                 id="price-tts"
-                step="0.2"
+                step="0.01"
                 min="0"
                 max="100"
                 value={priceTTS}
