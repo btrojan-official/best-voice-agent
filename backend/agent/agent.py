@@ -304,7 +304,7 @@ class CustomerSupportAgent:
                         "You just used tools successfully: "
                         + "; ".join(tool_results_summary)
                         + ". Now continue the conversation naturally with the customer. "
-                        "Acknowledge what was saved and ask for the next piece of information if needed."
+                        "Acknowledge what was saved and ask for the next piece of information if needed. DON'T USE TOOL AGAIN!!!"
                     )
 
                     self.conversation_history.append(

@@ -181,7 +181,7 @@ class Database:
     async def auto_complete_stale_calls(self, inactive_minutes: int = 3) -> int:
         """
         Automatically mark PENDING calls as COMPLETED if their last message
-        was more than the specified minutes ago.
+        (or start_time if no messages) was more than the specified minutes ago.
 
         Args:
             inactive_minutes: Number of minutes of inactivity before auto-completing
@@ -197,30 +197,33 @@ class Database:
 
             for call_data in calls:
                 if call_data.get("status") == CallStatus.PENDING.value:
+                    timestamp_to_check = None
+
                     # Check if call has messages
                     messages = call_data.get("messages", [])
                     if messages:
-                        # Get the last message timestamp
+                        # Use the last message timestamp
                         last_message = messages[-1]
-                        last_timestamp_str = last_message.get("timestamp")
+                        timestamp_to_check = last_message.get("timestamp")
+                    else:
+                        # No messages - use start_time
+                        timestamp_to_check = call_data.get("start_time")
 
-                        if last_timestamp_str:
-                            try:
-                                last_timestamp = datetime.fromisoformat(
-                                    last_timestamp_str
-                                )
-                                time_diff = (
-                                    current_time - last_timestamp
-                                ).total_seconds() / 60
+                    if timestamp_to_check:
+                        try:
+                            last_timestamp = datetime.fromisoformat(timestamp_to_check)
+                            time_diff = (
+                                current_time - last_timestamp
+                            ).total_seconds() / 60
 
-                                # If last message was more than inactive_minutes ago, mark as completed
-                                if time_diff >= inactive_minutes:
-                                    call_data["status"] = CallStatus.COMPLETED.value
-                                    call_data["end_time"] = current_time.isoformat()
-                                    updated_count += 1
-                            except (ValueError, TypeError) as e:
-                                # Skip calls with invalid timestamps
-                                pass
+                            # If last activity was more than inactive_minutes ago, mark as completed
+                            if time_diff >= inactive_minutes:
+                                call_data["status"] = CallStatus.COMPLETED.value
+                                call_data["end_time"] = current_time.isoformat()
+                                updated_count += 1
+                        except (ValueError, TypeError) as e:
+                            # Skip calls with invalid timestamps
+                            pass
 
             if updated_count > 0:
                 self._write_json(self.calls_file, calls)
