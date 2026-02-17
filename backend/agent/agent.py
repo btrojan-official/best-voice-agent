@@ -345,7 +345,7 @@ class CustomerSupportAgent:
                         logger.warning(
                             "Model still didn't provide a message after followup query."
                         )
-                        full_response = "I've recorded that information. What else can I help you with?"
+                        full_response = "I've recorded that information. Could you explain it a bit more?"
 
             except Exception as e:
                 logger.warning(
