@@ -3,6 +3,7 @@ import logging
 import os
 import tempfile
 from typing import Optional
+from urllib.parse import urljoin
 
 import requests
 from dotenv import load_dotenv
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "whisper-large-v3")
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 
 
 async def transcribe_audio_stream(audio_bytes: bytes) -> Optional[str]:
@@ -40,7 +42,7 @@ async def transcribe_audio_stream(audio_bytes: bytes) -> Optional[str]:
             temp_path = temp_file.name
 
         try:
-            url = "https://api.groq.com/openai/v1/audio/transcriptions"
+            url = urljoin(GROQ_BASE_URL, "audio/transcriptions")
 
             headers = {"Authorization": f"Bearer {groq_api_key}"}
 

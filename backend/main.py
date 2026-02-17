@@ -97,14 +97,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Get CORS origins from environment variable
+cors_origins = os.getenv(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:3000,http://localhost,http://localhost:80"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # Vite dev server
-        "http://localhost:3000",  # Alternative dev port
-        "http://localhost",  # Docker nginx frontend
-        "http://localhost:80",  # Explicit port 80
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

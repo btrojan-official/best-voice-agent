@@ -8,6 +8,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+from urllib.parse import urljoin
 
 import requests
 from dotenv import load_dotenv
@@ -16,9 +17,12 @@ load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
+ELEVENLABS_BASE_URL = os.getenv("ELEVENLABS_BASE_URL", "https://api.elevenlabs.io/v1")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "whisper-large-v3")
 
 
@@ -48,7 +52,7 @@ def test_openrouter():
     print("Sending test prompt: 'Hello, respond with just OK'")
 
     try:
-        url = "https://openrouter.ai/api/v1/chat/completions"
+        url = urljoin(OPENROUTER_BASE_URL, "chat/completions")
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
@@ -97,7 +101,7 @@ def test_elevenlabs():
     print("Converting text: 'Hello, this is a test'")
 
     try:
-        url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
+        url = urljoin(ELEVENLABS_BASE_URL, f"text-to-speech/{ELEVENLABS_VOICE_ID}")
         headers = {"xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json"}
 
         payload = {
@@ -156,7 +160,7 @@ def test_groq():
                 f.write(b"data")
                 f.write((0).to_bytes(4, "little"))
 
-        url = "https://api.groq.com/openai/v1/audio/transcriptions"
+        url = urljoin(GROQ_BASE_URL, "audio/transcriptions")
         headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
 
         with open(temp_path, "rb") as audio_file:

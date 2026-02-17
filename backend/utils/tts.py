@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import Optional
+from urllib.parse import urljoin
 
 import requests
 from dotenv import load_dotenv
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "DODLEQrClDo8wCz460ld")
+ELEVENLABS_BASE_URL = os.getenv("ELEVENLABS_BASE_URL", "https://api.elevenlabs.io/v1")
 
 
 async def text_to_speech_stream(text: str, model_id: str = "eleven_turbo_v2") -> bytes:
@@ -30,7 +32,7 @@ async def text_to_speech_stream(text: str, model_id: str = "eleven_turbo_v2") ->
             logger.warning("ELEVENLABS_API_KEY not configured, returning empty audio")
             return b""
 
-        url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
+        url = urljoin(ELEVENLABS_BASE_URL, f"text-to-speech/{ELEVENLABS_VOICE_ID}")
 
         headers = {"xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json"}
 
