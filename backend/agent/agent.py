@@ -183,15 +183,13 @@ class CustomerSupportAgent:
                 ChatMessage(role=MessageRole.USER, content=user_message)
             )
             
-            # If an acknowledgment was used, add it as assistant message for context
-            if acknowledgment:
-                self.conversation_history.append(
-                    ChatMessage(role=MessageRole.ASSISTANT, content=acknowledgment)
-                )
+            # Note: We do NOT add acknowledgment to history
+            # Acknowledgments are just filler phrases while the model thinks
+            # They should not influence the model's response
             
             logger.info(f"Processing user message: {user_message}")
             if acknowledgment:
-                logger.info(f"With acknowledgment: {acknowledgment}")
+                logger.info(f"Acknowledgment was played: {acknowledgment}")
             
             # Update memory management (summarize if needed)
             await self._update_memory()
@@ -316,11 +314,7 @@ class CustomerSupportAgent:
             if tool_calls_made:
                 logger.info(f"Tool calls made: {len(tool_calls_made)}")
             
-            # Update the last assistant message with full response
-            # Remove the acknowledgment-only message if it exists
-            if acknowledgment:
-                self.conversation_history.pop()  # Remove acknowledgment
-            
+            # Add the full response to conversation history
             self.conversation_history.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content=full_response)
             )
