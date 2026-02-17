@@ -208,15 +208,20 @@ class CustomerSupportAgent:
                     tools=get_available_tools()
                 )
                 
+                logger.info("Raw response:")
+                logger.info(response.raw)
+
                 # Check if model wants to call a tool
                 tool_calls_made = []
-                if hasattr(response, 'message') and hasattr(response.message, 'additional_kwargs'):
-                    tool_calls = response.message.additional_kwargs.get('tool_calls', [])
+                logger.info(response.raw.choices[0].message.tool_calls or [])
+                if hasattr(response.raw.choices[0].message, 'tool_calls') and response.raw.choices[0].message.tool_calls:
+                    logger.info(f"Tool call!!!!!!!!!!!")
+                    tool_calls = response.raw.choices[0].message.tool_calls
                     
                     for tool_call in tool_calls:
-                        if tool_call.get('type') == 'function':
-                            function_name = tool_call['function']['name']
-                            function_args = json.loads(tool_call['function']['arguments'])
+                        if tool_call.type == 'function':
+                            function_name = tool_call.function.name
+                            function_args = json.loads(tool_call.function.arguments)
                             
                             logger.info(f"Tool call: {function_name} with args: {function_args}")
                             
@@ -232,7 +237,45 @@ class CustomerSupportAgent:
                                 self.tool_calls.append(tool_calls_made[-1])
                 
                 # Get the text response (tools are called but response continues)
-                full_response = response.message.content if hasattr(response, 'message') else str(response)
+                full_response = response.message.content if hasattr(response, 'message') and response.message.content else ""
+                
+                # If no content but tool calls were made, query model again with tool results
+                if (not full_response or full_response.strip() == "") and tool_calls_made:
+                    logger.info("Tool was used but model didn't provide a text response. Querying model again with tool results.")
+                    
+                    # Add tool call information to conversation history as a system message
+                    tool_results_summary = []
+                    for tool_call in tool_calls_made:
+                        tool_results_summary.append(f"Tool '{tool_call['tool']}' was executed successfully with data: {tool_call['args']}")
+                    
+                    tool_info_message = (
+                        "You just used tools successfully: " + "; ".join(tool_results_summary) + 
+                        ". Now continue the conversation naturally with the customer. "
+                        "Acknowledge what was saved and ask for the next piece of information if needed."
+                    )
+                    
+                    # Add a system message about tool usage
+                    self.conversation_history.append(
+                        ChatMessage(role=MessageRole.SYSTEM, content=tool_info_message)
+                    )
+                    
+                    # Query the model again
+                    history_for_followup = self._get_condensed_history()
+                    followup_response = await self.llm.achat(
+                        messages=history_for_followup,
+                        tools=get_available_tools()
+                    )
+                    
+                    # Get the followup text response
+                    full_response = followup_response.message.content if hasattr(followup_response, 'message') and followup_response.message.content else ""
+                    
+                    # Remove the temporary system message
+                    self.conversation_history.pop()
+                    
+                    # If still no response, use fallback
+                    if not full_response or full_response.strip() == "":
+                        logger.warning("Model still didn't provide a message after followup query.")
+                        full_response = "I've recorded that information. What else can I help you with?"
                 
             except Exception as e:
                 logger.warning(f"Tool calling not supported or error: {e}, falling back to streaming")
