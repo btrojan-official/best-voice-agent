@@ -49,11 +49,17 @@ async def login(request: LoginRequest):
 async def get_all_calls(token: str = Depends(require_auth)):
     """
     Get all calls.
+    Auto-completes PENDING calls that have been inactive for 3+ minutes.
 
     Returns:
         List of all calls
     """
     try:
+        # Auto-complete stale pending calls (inactive for 3+ minutes)
+        updated_count = await db.auto_complete_stale_calls(inactive_minutes=3)
+        if updated_count > 0:
+            logger.info(f"Auto-completed {updated_count} stale PENDING calls")
+
         calls = await db.get_all_calls()
         calls_sorted = sorted(calls, key=lambda x: x.start_time, reverse=True)
         logger.info(f"Retrieved {len(calls)} calls")

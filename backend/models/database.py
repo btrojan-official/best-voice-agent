@@ -178,6 +178,60 @@ class Database:
 
         return call
 
+    async def auto_complete_stale_calls(self, inactive_minutes: int = 3) -> int:
+        """
+        Automatically mark PENDING calls as COMPLETED if their last message
+        was more than the specified minutes ago.
+
+        Args:
+            inactive_minutes: Number of minutes of inactivity before auto-completing
+
+        Returns:
+            Number of calls auto-completed
+        """
+        updated_count = 0
+
+        async with self.lock:
+            calls = self._read_json(self.calls_file)
+            current_time = datetime.now()
+
+            for call_data in calls:
+                if call_data.get("status") == CallStatus.PENDING.value:
+                    # Check if call has messages
+                    messages = call_data.get("messages", [])
+                    if messages:
+                        # Get the last message timestamp
+                        last_message = messages[-1]
+                        last_timestamp_str = last_message.get("timestamp")
+
+                        if last_timestamp_str:
+                            try:
+                                last_timestamp = datetime.fromisoformat(
+                                    last_timestamp_str
+                                )
+                                time_diff = (
+                                    current_time - last_timestamp
+                                ).total_seconds() / 60
+
+                                # If last message was more than inactive_minutes ago, mark as completed
+                                if time_diff >= inactive_minutes:
+                                    call_data["status"] = CallStatus.COMPLETED.value
+                                    call_data["end_time"] = current_time.isoformat()
+                                    updated_count += 1
+                            except (ValueError, TypeError) as e:
+                                # Skip calls with invalid timestamps
+                                pass
+
+            if updated_count > 0:
+                self._write_json(self.calls_file, calls)
+
+        # Update stats outside the lock
+        if updated_count > 0:
+            await self._increment_stat("pending_calls", -updated_count)
+            await self._increment_stat("completed_calls", updated_count)
+
+        return updated_count
+
     async def add_message_to_call(self, call_id: str, message: Message):
         """Add a message to a call."""
         call = await self.get_call(call_id)

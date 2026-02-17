@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "whisper-large-v3")
-GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1/")
 
 
 async def transcribe_audio_stream(audio_bytes: bytes) -> Optional[str]:
@@ -43,6 +43,8 @@ async def transcribe_audio_stream(audio_bytes: bytes) -> Optional[str]:
 
         try:
             url = urljoin(GROQ_BASE_URL, "audio/transcriptions")
+
+            logger.info(f"{GROQ_BASE_URL} - {url}")
 
             headers = {"Authorization": f"Bearer {groq_api_key}"}
 
