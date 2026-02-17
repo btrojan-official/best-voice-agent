@@ -31,12 +31,10 @@ async def _precompute_audio():
     This reduces latency during conversations.
     """
     try:
-        # Check if ElevenLabs API key is configured
         if not os.getenv("ELEVENLABS_API_KEY"):
             logger.warning("ELEVENLABS_API_KEY not found - skipping audio precomputation")
             return
         
-        # Generate greeting audio
         greeting_text = "Hello! Thank you for contacting customer support. How can I help you today?"
         logger.info(f"Generating greeting audio: '{greeting_text}'")
         greeting_audio = await text_to_speech_stream(greeting_text)
@@ -46,7 +44,6 @@ async def _precompute_audio():
         else:
             logger.warning("Failed to generate greeting audio")
         
-        # Generate acknowledgment audios
         acknowledgments = [
             "Let me think...",
             "Okay...",
@@ -82,7 +79,6 @@ async def lifespan(app: FastAPI):
     os.makedirs("logs", exist_ok=True)
     os.makedirs("data", exist_ok=True)
     
-    # Precompute greeting and acknowledgment audio for low latency
     logger.info("Precomputing audio files...")
     await _precompute_audio()
     

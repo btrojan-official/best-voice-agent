@@ -141,15 +141,6 @@ Frontend will be available at `http://localhost:5173`
 - **Smart Interruptions**: Agent pauses when user starts speaking or new audio arrives
 - **Auto-Cleanup**: Conversations automatically end and clear after 3 minutes of inactivity
 
-To generate precomputed audio files:
-```bash
-# From backend directory
-python generate_audio.py
-
-# Or in Docker
-docker compose exec backend python generate_audio.py
-```
-
 ### Admin Dashboard
 - Real-time call monitoring
 - Detailed usage statistics

@@ -217,7 +217,6 @@ class CustomerSupportAgent:
                 logger.info("Raw response:")
                 logger.info(response.raw)
                 
-                # Extract actual token usage from response
                 if hasattr(response.raw, 'usage'):
                     usage = response.raw.usage
                     usage_data = {
@@ -227,7 +226,6 @@ class CustomerSupportAgent:
                     }
                     logger.info(f"Token usage: {usage_data}")
 
-                # Check if model wants to call a tool
                 tool_calls_made = []
                 logger.info(response.raw.choices[0].message.tool_calls or [])
                 if hasattr(response.raw.choices[0].message, 'tool_calls') and response.raw.choices[0].message.tool_calls:
@@ -252,14 +250,11 @@ class CustomerSupportAgent:
                                 })
                                 self.tool_calls.append(tool_calls_made[-1])
                 
-                # Get the text response (tools are called but response continues)
                 full_response = response.message.content if hasattr(response, 'message') and response.message.content else ""
                 
-                # If no content but tool calls were made, query model again with tool results
                 if (not full_response or full_response.strip() == "") and tool_calls_made:
                     logger.info("Tool was used but model didn't provide a text response. Querying model again with tool results.")
                     
-                    # Add tool call information to conversation history as a system message
                     tool_results_summary = []
                     for tool_call in tool_calls_made:
                         tool_results_summary.append(f"Tool '{tool_call['tool']}' was executed successfully with data: {tool_call['args']}")
@@ -270,23 +265,19 @@ class CustomerSupportAgent:
                         "Acknowledge what was saved and ask for the next piece of information if needed."
                     )
                     
-                    # Add a system message about tool usage
                     self.conversation_history.append(
                         ChatMessage(role=MessageRole.SYSTEM, content=tool_info_message)
                     )
                     
-                    # Query the model again
                     history_for_followup = self._get_condensed_history()
                     followup_response = await self.llm.achat(
                         messages=history_for_followup,
                         tools=get_available_tools()
                     )
                     
-                    # Update usage data from followup if available
                     if hasattr(followup_response.raw, 'usage'):
                         followup_usage = followup_response.raw.usage
                         if usage_data:
-                            # Combine token counts from both calls
                             usage_data['prompt_tokens'] += followup_usage.prompt_tokens
                             usage_data['completion_tokens'] += followup_usage.completion_tokens
                             usage_data['total_tokens'] += followup_usage.total_tokens
@@ -298,13 +289,10 @@ class CustomerSupportAgent:
                             }
                         logger.info(f"Updated token usage after followup: {usage_data}")
                     
-                    # Get the followup text response
                     full_response = followup_response.message.content if hasattr(followup_response, 'message') and followup_response.message.content else ""
                     
-                    # Remove the temporary system message
                     self.conversation_history.pop()
                     
-                    # If still no response, use fallback
                     if not full_response or full_response.strip() == "":
                         logger.warning("Model still didn't provide a message after followup query.")
                         full_response = "I've recorded that information. What else can I help you with?"
@@ -324,7 +312,6 @@ class CustomerSupportAgent:
                             first_chunk_time = time.time()
                         full_response += chunk.delta
                         chunk_count += 1
-                        # Only send first chunk latency with first chunk
                         if chunk_count == 1 and first_chunk_time:
                             yield chunk.delta, (first_chunk_time - start_time) * 1000, None, None
                         else:
@@ -333,23 +320,19 @@ class CustomerSupportAgent:
             end_time = time.time()
             total_latency_ms = (end_time - start_time) * 1000
             
-            # If we used achat (non-streaming), yield the full response at once
             if full_response:
                 first_chunk_latency_ms = total_latency_ms
                 yield full_response, first_chunk_latency_ms, None, None
             
-            # Log the complete response
             logger.info(f"Response generated in {total_latency_ms:.0f}ms")
             logger.info(f"Full output: {full_response}")
             if tool_calls_made:
                 logger.info(f"Tool calls made: {len(tool_calls_made)}")
             
-            # Add the full response to conversation history
             self.conversation_history.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content=full_response)
             )
             
-            # Send final marker with total latency and usage data
             yield "", None, total_latency_ms, usage_data
         
         except Exception as e:
@@ -406,10 +389,8 @@ Please provide a concise summary of the key points, customer issues, and resolut
         Returns:
             Condensed list of ChatMessages
         """
-        # Always include system prompt (first message)
         condensed = [self.conversation_history[0]]
         
-        # If we have a summary, add it as a system message
         if self.conversation_summary:
             condensed.append(
                 ChatMessage(
@@ -418,7 +399,6 @@ Please provide a concise summary of the key points, customer issues, and resolut
                 )
             )
         
-        # Add recent messages (excluding system prompt at index 0)
         all_messages_except_system = self.conversation_history[1:]
         if all_messages_except_system:
             recent_messages = all_messages_except_system[-self.keep_recent_messages:]
@@ -431,29 +411,23 @@ Please provide a concise summary of the key points, customer issues, and resolut
         Update long-short term memory if needed.
         Every 20 non-summarized messages, summarize oldest 16 and keep last 4.
         """
-        # Count messages after system prompt and after last summary point
-        all_messages_except_system = self.conversation_history[1:]  # Exclude system prompt
+        all_messages_except_system = self.conversation_history[1:]
         non_summarized_messages = all_messages_except_system[self.last_summary_point:]
         
         non_summarized_count = len(non_summarized_messages)
         
-        # Check if we need to create/update summary (every 20 non-summarized messages)
         if non_summarized_count >= self.summary_threshold:
             logger.info(f"Reached {non_summarized_count} non-summarized messages, creating/updating summary")
             
-            # Summarize oldest (count - 4) messages, keep last 4
             messages_to_summarize_count = non_summarized_count - self.keep_recent_messages
             
             if messages_to_summarize_count > 0:
-                # Get messages to summarize (oldest messages)
-                start_idx = 1 + self.last_summary_point  # +1 to skip system prompt
+                start_idx = 1 + self.last_summary_point
                 end_idx = start_idx + messages_to_summarize_count
                 messages_to_summarize = self.conversation_history[start_idx:end_idx]
                 
-                # Generate new summary
                 self.conversation_summary = await self._generate_conversation_summary(messages_to_summarize)
                 
-                # Update last summary point
                 self.last_summary_point += messages_to_summarize_count
                 
                 logger.info(f"Summarized {messages_to_summarize_count} messages, new summary point at index {self.last_summary_point}")

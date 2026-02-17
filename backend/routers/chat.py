@@ -1,14 +1,12 @@
 import asyncio
 import base64
-import json
 import logging
 from typing import Dict
 from datetime import datetime
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.responses import StreamingResponse
 
-from models import db, CallStatus, Message, UsageStats, CostStats
+from models import db, CallStatus, Message
 from agent import CustomerSupportAgent
 from utils.transcription import transcribe_audio_stream
 from utils.tts import text_to_speech_stream
@@ -122,7 +120,6 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
         )
         manager.set_agent(call_id, agent)
         
-        # Try to use precomputed greeting first
         greeting_data = precomputed_audio_manager.get_greeting()
         
         if greeting_data:
@@ -155,7 +152,6 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
             
             logger.info(f"Used precomputed greeting for call {call_id}")
         else:
-            # Fallback to generating greeting
             greeting = await agent.get_greeting()
             
             message = Message(
@@ -216,17 +212,13 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         call = await db.get_call(call_id)
                         call.usage_stats.input_characters += len(transcription)
                         call.usage_stats.transcription_seconds += len(audio_bytes) / 16000
-                        # Calculate transcription cost: (seconds / 5) * price_per_5s
                         call.cost_stats.transcription_cost += ((len(audio_bytes) / 16000) / 5) * settings.price_per_5s_transcription
                         await db.update_call(call)
                         
-                        # Get random acknowledgment and wait 1 second before sending
                         ack_data = precomputed_audio_manager.get_random_acknowledgment()
                         
-                        # Wait 1 second for a more natural conversation flow
                         await asyncio.sleep(1.0)
                         
-                        # Send acknowledgment audio after delay
                         if ack_data["audio"]:
                             await websocket.send_json({
                                 "type": "acknowledgment",
@@ -235,7 +227,6 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                             })
                             logger.info(f"Sent precomputed acknowledgment: {ack_data['text']}")
                         else:
-                            # Generate acknowledgment audio on-the-fly
                             try:
                                 ack_audio = await text_to_speech_stream(ack_data["text"])
                                 if ack_audio:
@@ -244,26 +235,21 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                                         "text": ack_data["text"],
                                         "data": base64.b64encode(ack_audio).decode('utf-8')
                                     })
-                                    # Save for future use
                                     precomputed_audio_manager.save_acknowledgment_audio(ack_data["text"], ack_audio)
                                     logger.info(f"Generated and sent acknowledgment: {ack_data['text']}")
                             except Exception as e:
                                 logger.error(f"Error generating acknowledgment: {e}")
                         
-                        # Process message with acknowledgment context
                         response_text = ""
-                        first_chunk_latency_ms = None
                         total_latency_ms = None
                         usage_data = None
                         async for chunk_data in agent.process_message(transcription, ack_data["text"]):
-                            chunk, first_latency, total_latency, usage = chunk_data
-                            if first_latency is not None:
-                                first_chunk_latency_ms = first_latency
+                            chunk, _, total_latency, usage = chunk_data
                             if total_latency is not None:
                                 total_latency_ms = total_latency
                             if usage is not None:
                                 usage_data = usage
-                            if chunk:  # Only send non-empty chunks
+                            if chunk:
                                 response_text += chunk
                                 await websocket.send_json({
                                     "type": "response_chunk",
@@ -286,43 +272,35 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         call.usage_stats.output_characters += len(response_text)
                         call.usage_stats.llm_calls += 1
                         
-                        # Store latency for this call (use total latency for better accuracy)
                         if total_latency_ms:
                             call.usage_stats.llm_latency_ms += total_latency_ms
                         
-                        # Use actual token counts from LLM response if available, otherwise estimate
                         if usage_data:
                             actual_output_tokens = usage_data['completion_tokens']
                             actual_input_tokens = usage_data['prompt_tokens']
                             call.usage_stats.output_tokens += actual_output_tokens
                             call.usage_stats.input_tokens += actual_input_tokens
                             
-                            # Calculate LLM costs using actual tokens
                             call.cost_stats.llm_output_cost += (actual_output_tokens / 1_000_000) * settings.price_per_million_output_tokens
                             call.cost_stats.llm_input_cost += (actual_input_tokens / 1_000_000) * settings.price_per_million_input_tokens
                             
                             logger.info(f"Using actual token counts - Input: {actual_input_tokens}, Output: {actual_output_tokens}")
                         else:
-                            # Fallback to estimation if usage data not available
                             estimated_output_tokens = len(response_text) // settings.estimated_token_length
                             call.usage_stats.output_tokens += estimated_output_tokens
                             
-                            # Calculate LLM output cost: (tokens / 1M) * price_per_million
                             call.cost_stats.llm_output_cost += (estimated_output_tokens / 1_000_000) * settings.price_per_million_output_tokens
                             
-                            # Also add input cost based on input characters
                             estimated_input_tokens = len(transcription) // settings.estimated_token_length
                             call.usage_stats.input_tokens += estimated_input_tokens
                             call.cost_stats.llm_input_cost += (estimated_input_tokens / 1_000_000) * settings.price_per_million_input_tokens
                             
                             logger.info(f"Using estimated token counts - Input: {estimated_input_tokens}, Output: {estimated_output_tokens}")
                         
-                        # Update conversation summary if available (for long-short term memory)
                         conversation_summary = agent.get_conversation_summary()
                         if conversation_summary:
                             call.conversation_summary = conversation_summary
                         
-                        # Update gathered information from agent
                         gathered_info = agent.get_gathered_information()
                         if gathered_info:
                             call.gathered_information = gathered_info
@@ -338,7 +316,6 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                             
                             call = await db.get_call(call_id)
                             call.usage_stats.tts_characters += len(response_text)
-                            # Calculate TTS cost: (chars / 10000) * price_per_10k
                             call.cost_stats.tts_cost += (len(response_text) / 10000) * settings.price_per_10k_tts_chars
                             await db.update_call(call)
                         
@@ -369,7 +346,6 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         "message": str(e)
                     })
                 except:
-                    # Websocket already closed
                     websocket_disconnected = True
                     break
         
@@ -407,13 +383,11 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
         )
     
     except WebSocketDisconnect:
-        # User hung up - this is normal, not an error
         logger.info(f"User hung up call {call_id}")
         websocket_disconnected = True
     
     except Exception as e:
         logger.error(f"Fatal error in WebSocket: {e}")
-        # Only mark as ERROR if websocket is still connected (real error, not user hangup)
         if not websocket_disconnected:
             await db.update_call_status(call_id, CallStatus.ERROR, str(e))
         else:
