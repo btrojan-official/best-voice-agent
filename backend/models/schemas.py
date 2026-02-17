@@ -1,6 +1,7 @@
-from enum import Enum
-from typing import List, Dict, Any, Optional
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -57,9 +58,13 @@ class Call(BaseModel):
     end_time: Optional[str] = None
     messages: List[Message] = Field(default_factory=list)
     tool_calls: List[ToolCall] = Field(default_factory=list)
-    gathered_information: Dict[str, str] = Field(default_factory=dict)  # Structured data collected from customer
+    gathered_information: Dict[str, str] = Field(
+        default_factory=dict
+    )  # Structured data collected from customer
     summary: Optional[str] = None
-    conversation_summary: Optional[str] = None  # Running summary for long-short term memory
+    conversation_summary: Optional[str] = (
+        None  # Running summary for long-short term memory
+    )
     usage_stats: UsageStats = Field(default_factory=UsageStats)
     cost_stats: CostStats = Field(default_factory=CostStats)
     error_message: Optional[str] = None

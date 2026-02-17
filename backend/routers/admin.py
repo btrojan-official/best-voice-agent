@@ -3,11 +3,17 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from models import (
-    db, LoginRequest, LoginResponse, SettingsUpdateRequest,
-    InformationToGatherRequest, Call, Settings, SystemStats
-)
 from auth import AuthService, require_auth
+from models import (
+    Call,
+    InformationToGatherRequest,
+    LoginRequest,
+    LoginResponse,
+    Settings,
+    SettingsUpdateRequest,
+    SystemStats,
+    db,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -17,10 +23,10 @@ router = APIRouter()
 async def login(request: LoginRequest):
     """
     Admin login endpoint.
-    
+
     Args:
         request: Login credentials
-    
+
     Returns:
         Login response with token
     """
@@ -28,19 +34,12 @@ async def login(request: LoginRequest):
         if AuthService.verify_credentials(request.username, request.password):
             token = AuthService.create_token(request.username)
             logger.info(f"Successful login for user: {request.username}")
-            
-            return LoginResponse(
-                success=True,
-                token=token,
-                message="Login successful"
-            )
+
+            return LoginResponse(success=True, token=token, message="Login successful")
         else:
             logger.warning(f"Failed login attempt for user: {request.username}")
-            return LoginResponse(
-                success=False,
-                message="Invalid credentials"
-            )
-    
+            return LoginResponse(success=False, message="Invalid credentials")
+
     except Exception as e:
         logger.error(f"Login error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -50,7 +49,7 @@ async def login(request: LoginRequest):
 async def get_all_calls(token: str = Depends(require_auth)):
     """
     Get all calls.
-    
+
     Returns:
         List of all calls
     """
@@ -59,7 +58,7 @@ async def get_all_calls(token: str = Depends(require_auth)):
         calls_sorted = sorted(calls, key=lambda x: x.start_time, reverse=True)
         logger.info(f"Retrieved {len(calls)} calls")
         return calls_sorted
-    
+
     except Exception as e:
         logger.error(f"Error retrieving calls: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -69,10 +68,10 @@ async def get_all_calls(token: str = Depends(require_auth)):
 async def get_call_details(call_id: str, token: str = Depends(require_auth)):
     """
     Get detailed information about a specific call.
-    
+
     Args:
         call_id: Call ID
-    
+
     Returns:
         Call details
     """
@@ -80,10 +79,10 @@ async def get_call_details(call_id: str, token: str = Depends(require_auth)):
         call = await db.get_call(call_id)
         if not call:
             raise HTTPException(status_code=404, detail="Call not found")
-        
+
         logger.info(f"Retrieved details for call {call_id}")
         return call
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -95,10 +94,10 @@ async def get_call_details(call_id: str, token: str = Depends(require_auth)):
 async def delete_call(call_id: str, token: str = Depends(require_auth)):
     """
     Delete a call.
-    
+
     Args:
         call_id: Call ID
-    
+
     Returns:
         Success message
     """
@@ -106,11 +105,11 @@ async def delete_call(call_id: str, token: str = Depends(require_auth)):
         call = await db.get_call(call_id)
         if not call:
             raise HTTPException(status_code=404, detail="Call not found")
-        
+
         logger.info(f"Call {call_id} deletion requested (not implemented)")
-        
+
         return {"success": True, "message": "Call deleted"}
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -122,7 +121,7 @@ async def delete_call(call_id: str, token: str = Depends(require_auth)):
 async def get_stats(token: str = Depends(require_auth)):
     """
     Get system statistics.
-    
+
     Returns:
         System statistics
     """
@@ -130,7 +129,7 @@ async def get_stats(token: str = Depends(require_auth)):
         stats = await db.get_stats()
         logger.info("Retrieved system statistics")
         return stats
-    
+
     except Exception as e:
         logger.error(f"Error retrieving stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -140,7 +139,7 @@ async def get_stats(token: str = Depends(require_auth)):
 async def get_settings(token: str = Depends(require_auth)):
     """
     Get current settings.
-    
+
     Returns:
         Settings
     """
@@ -148,7 +147,7 @@ async def get_settings(token: str = Depends(require_auth)):
         settings = await db.get_settings()
         logger.info("Retrieved settings")
         return settings
-    
+
     except Exception as e:
         logger.error(f"Error retrieving settings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -156,52 +155,54 @@ async def get_settings(token: str = Depends(require_auth)):
 
 @router.patch("/settings")
 async def update_settings(
-    request: SettingsUpdateRequest,
-    token: str = Depends(require_auth)
+    request: SettingsUpdateRequest, token: str = Depends(require_auth)
 ):
     """
     Update settings.
-    
+
     Args:
         request: Settings update request
-    
+
     Returns:
         Updated settings
     """
     try:
         settings = await db.get_settings()
-        
+
         if request.model_name is not None:
             settings.model_name = request.model_name
-        
+
         if request.temperature is not None:
             if not 0.0 <= request.temperature <= 2.0:
                 raise HTTPException(
-                    status_code=400,
-                    detail="Temperature must be between 0.0 and 2.0"
+                    status_code=400, detail="Temperature must be between 0.0 and 2.0"
                 )
             settings.temperature = request.temperature
-        
+
         if request.price_per_million_input_tokens is not None:
-            settings.price_per_million_input_tokens = request.price_per_million_input_tokens
-        
+            settings.price_per_million_input_tokens = (
+                request.price_per_million_input_tokens
+            )
+
         if request.price_per_million_output_tokens is not None:
-            settings.price_per_million_output_tokens = request.price_per_million_output_tokens
-        
+            settings.price_per_million_output_tokens = (
+                request.price_per_million_output_tokens
+            )
+
         if request.price_per_5s_transcription is not None:
             settings.price_per_5s_transcription = request.price_per_5s_transcription
-        
+
         if request.price_per_10k_tts_chars is not None:
             settings.price_per_10k_tts_chars = request.price_per_10k_tts_chars
-        
+
         if request.estimated_token_length is not None:
             settings.estimated_token_length = request.estimated_token_length
-        
+
         updated_settings = await db.update_settings(settings)
         logger.info("Updated settings")
-        
+
         return updated_settings
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -211,27 +212,25 @@ async def update_settings(
 
 @router.post("/settings/information")
 async def add_information_to_gather(
-    request: InformationToGatherRequest,
-    token: str = Depends(require_auth)
+    request: InformationToGatherRequest, token: str = Depends(require_auth)
 ):
     """
     Add new information to gather.
-    
+
     Args:
         request: Information to gather details
-    
+
     Returns:
         Created information item
     """
     try:
         info = await db.add_information_to_gather(
-            title=request.title,
-            description=request.description
+            title=request.title, description=request.description
         )
         logger.info(f"Added information to gather: {request.title}")
-        
+
         return info
-    
+
     except Exception as e:
         logger.error(f"Error adding information to gather: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -239,28 +238,27 @@ async def add_information_to_gather(
 
 @router.delete("/settings/information/{info_id}")
 async def remove_information_to_gather(
-    info_id: str,
-    token: str = Depends(require_auth)
+    info_id: str, token: str = Depends(require_auth)
 ):
     """
     Remove information to gather.
-    
+
     Args:
         info_id: Information ID
-    
+
     Returns:
         Success message
     """
     try:
         success = await db.remove_information_to_gather(info_id)
-        
+
         if not success:
             raise HTTPException(status_code=404, detail="Information not found")
-        
+
         logger.info(f"Removed information to gather: {info_id}")
-        
+
         return {"success": True, "message": "Information removed"}
-    
+
     except HTTPException:
         raise
     except Exception as e:

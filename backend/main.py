@@ -2,24 +2,21 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 
-from routers import chat, admin
 from models import db
-from utils.tts import text_to_speech_stream
+from routers import admin, chat
 from utils.precomputed_audio import precomputed_audio_manager
+from utils.tts import text_to_speech_stream
 
 load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/app.log'),
-        logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("logs/app.log"), logging.StreamHandler()],
 )
 
 logger = logging.getLogger(__name__)
@@ -32,9 +29,11 @@ async def _precompute_audio():
     """
     try:
         if not os.getenv("ELEVENLABS_API_KEY"):
-            logger.warning("ELEVENLABS_API_KEY not found - skipping audio precomputation")
+            logger.warning(
+                "ELEVENLABS_API_KEY not found - skipping audio precomputation"
+            )
             return
-        
+
         greeting_text = "Hello! Thank you for contacting customer support. How can I help you today?"
         logger.info(f"Generating greeting audio: '{greeting_text}'")
         greeting_audio = await text_to_speech_stream(greeting_text)
@@ -43,7 +42,7 @@ async def _precompute_audio():
             logger.info(f"✓ Greeting audio saved ({len(greeting_audio)} bytes)")
         else:
             logger.warning("Failed to generate greeting audio")
-        
+
         acknowledgments = [
             "Let me think...",
             "Okay...",
@@ -51,7 +50,7 @@ async def _precompute_audio():
             "Alright...",
             "Got it...",
         ]
-        
+
         for ack_text in acknowledgments:
             logger.info(f"Generating acknowledgment audio: '{ack_text}'")
             ack_audio = await text_to_speech_stream(ack_text)
@@ -60,12 +59,14 @@ async def _precompute_audio():
                 logger.info(f"✓ '{ack_text}' saved ({len(ack_audio)} bytes)")
             else:
                 logger.warning(f"Failed to generate '{ack_text}'")
-        
+
         logger.info("✓ All precomputed audio files generated successfully!")
-        
+
     except Exception as e:
         logger.error(f"Error precomputing audio: {e}")
-        logger.warning("Continuing without precomputed audio - will generate on-the-fly")
+        logger.warning(
+            "Continuing without precomputed audio - will generate on-the-fly"
+        )
 
 
 @asynccontextmanager
@@ -75,17 +76,17 @@ async def lifespan(app: FastAPI):
     Handles startup and shutdown events.
     """
     logger.info("Starting Best Voice Agent application")
-    
+
     os.makedirs("logs", exist_ok=True)
     os.makedirs("data", exist_ok=True)
-    
+
     logger.info("Precomputing audio files...")
     await _precompute_audio()
-    
+
     logger.info("Application startup complete")
-    
+
     yield
-    
+
     logger.info("Shutting down Best Voice Agent application")
 
 
@@ -93,7 +94,7 @@ app = FastAPI(
     title="Best Voice Agent API",
     description="Real-time streaming AI customer support agent",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -101,8 +102,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",  # Vite dev server
         "http://localhost:3000",  # Alternative dev port
-        "http://localhost",       # Docker nginx frontend
-        "http://localhost:80"     # Explicit port 80
+        "http://localhost",  # Docker nginx frontend
+        "http://localhost:80",  # Explicit port 80
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -116,11 +117,7 @@ app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 @app.get("/")
 async def root():
     """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "service": "Best Voice Agent",
-        "version": "1.0.0"
-    }
+    return {"status": "healthy", "service": "Best Voice Agent", "version": "1.0.0"}
 
 
 @app.get("/health")
@@ -128,31 +125,22 @@ async def health():
     """Detailed health check."""
     try:
         stats = await db.get_stats()
-        
+
         return {
             "status": "healthy",
             "database": "connected",
             "total_calls": stats.total_calls,
-            "pending_calls": stats.pending_calls
+            "pending_calls": stats.pending_calls,
         }
-    
+
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        return {"status": "unhealthy", "error": str(e)}
 
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     port = int(os.getenv("PORT", 8000))
-    
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=port,
-        reload=True,
-        log_level="info"
-    )
+
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True, log_level="info")

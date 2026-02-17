@@ -1,9 +1,9 @@
-import os
 import json
-import random
 import logging
-from typing import Dict, List, Optional
+import os
+import random
 from pathlib import Path
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ class PrecomputedAudioManager:
     Manages precomputed audio files for greetings and acknowledgment prompts.
     These are used to reduce latency and improve conversation flow.
     """
-    
+
     def __init__(self, audio_dir: str = "data/audio"):
         self.audio_dir = Path(audio_dir)
         self.audio_cache: Dict[str, bytes] = {}
@@ -27,13 +27,13 @@ class PrecomputedAudioManager:
         self.greeting_data: Optional[Dict[str, any]] = None
         self._load_greeting_config()
         self._ensure_audio_directory()
-    
+
     def _ensure_audio_directory(self):
         """Ensure audio directory exists."""
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         acknowledgments_dir = self.audio_dir / "acknowledgments"
         acknowledgments_dir.mkdir(exist_ok=True)
-        
+
     def _load_greeting_config(self):
         """Load greeting configuration from JSON."""
         config_path = self.audio_dir / "greeting.json"
@@ -44,36 +44,33 @@ class PrecomputedAudioManager:
                     logger.info("Loaded greeting configuration")
         except Exception as e:
             logger.error(f"Error loading greeting config: {e}")
-    
+
     def save_greeting_config(self, text: str, audio_file: str):
         """Save greeting configuration to JSON."""
         config_path = self.audio_dir / "greeting.json"
-        self.greeting_data = {
-            "text": text,
-            "file": audio_file
-        }
+        self.greeting_data = {"text": text, "file": audio_file}
         try:
             with open(config_path, "w") as f:
                 json.dump(self.greeting_data, f, indent=2)
             logger.info("Saved greeting configuration")
         except Exception as e:
             logger.error(f"Error saving greeting config: {e}")
-    
+
     def get_greeting(self) -> Optional[Dict[str, any]]:
         """
         Get precomputed greeting data.
-        
+
         Returns:
             Dictionary with 'text' and 'audio' (bytes) if available, None otherwise
         """
         if not self.greeting_data:
             return None
-        
+
         greeting_file = self.audio_dir / self.greeting_data["file"]
         if not greeting_file.exists():
             logger.warning(f"Greeting audio file not found: {greeting_file}")
             return None
-        
+
         try:
             # Load from cache or file
             cache_key = f"greeting_{self.greeting_data['file']}"
@@ -83,31 +80,24 @@ class PrecomputedAudioManager:
                 with open(greeting_file, "rb") as f:
                     audio_data = f.read()
                 self.audio_cache[cache_key] = audio_data
-            
-            return {
-                "text": self.greeting_data["text"],
-                "audio": audio_data
-            }
+
+            return {"text": self.greeting_data["text"], "audio": audio_data}
         except Exception as e:
             logger.error(f"Error loading greeting audio: {e}")
             return None
-    
+
     def get_random_acknowledgment(self) -> Dict[str, any]:
         """
         Get a random acknowledgment prompt with its audio.
-        
+
         Returns:
             Dictionary with 'text', 'audio' (bytes or None), and 'file' name
         """
         ack = random.choice(self.acknowledgments)
         ack_file = self.audio_dir / "acknowledgments" / ack["file"]
-        
-        result = {
-            "text": ack["text"],
-            "file": ack["file"],
-            "audio": None
-        }
-        
+
+        result = {"text": ack["text"], "file": ack["file"], "audio": None}
+
         if ack_file.exists():
             try:
                 # Load from cache or file
@@ -122,14 +112,16 @@ class PrecomputedAudioManager:
             except Exception as e:
                 logger.error(f"Error loading acknowledgment audio {ack['file']}: {e}")
         else:
-            logger.debug(f"Acknowledgment audio not found: {ack_file}, will generate on-the-fly")
-        
+            logger.debug(
+                f"Acknowledgment audio not found: {ack_file}, will generate on-the-fly"
+            )
+
         return result
-    
+
     def save_acknowledgment_audio(self, text: str, audio_data: bytes):
         """
         Save acknowledgment audio to file.
-        
+
         Args:
             text: Acknowledgment text
             audio_data: Audio bytes (MP3 format)
@@ -148,11 +140,11 @@ class PrecomputedAudioManager:
                 except Exception as e:
                     logger.error(f"Error saving acknowledgment audio: {e}")
                 break
-    
+
     def save_greeting_audio(self, text: str, audio_data: bytes):
         """
         Save greeting audio to file.
-        
+
         Args:
             text: Greeting text
             audio_data: Audio bytes (MP3 format)

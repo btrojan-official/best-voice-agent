@@ -1,6 +1,6 @@
 from .agent import CustomerSupportAgent
+from .prompts import CALL_TITLE_PROMPT, GREETING_PROMPT, SUMMARY_PROMPT, SYSTEM_PROMPT
 from .tools import CustomerSupportTools, get_available_tools
-from .prompts import SYSTEM_PROMPT, GREETING_PROMPT, SUMMARY_PROMPT, CALL_TITLE_PROMPT
 
 __all__ = [
     "CustomerSupportAgent",
@@ -9,5 +9,5 @@ __all__ = [
     "SYSTEM_PROMPT",
     "GREETING_PROMPT",
     "SUMMARY_PROMPT",
-    "CALL_TITLE_PROMPT"
+    "CALL_TITLE_PROMPT",
 ]
