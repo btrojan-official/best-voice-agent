@@ -165,7 +165,7 @@ class CustomerSupportAgent:
             )
             return fallback
     
-    async def process_message(self, user_message: str, acknowledgment: Optional[str] = None) -> AsyncGenerator[Tuple[str, Optional[float], Optional[float]], None]:
+    async def process_message(self, user_message: str, acknowledgment: Optional[str] = None) -> AsyncGenerator[Tuple[str, Optional[float], Optional[float], Optional[Dict[str, int]]], None]:
         """
         Process user message and stream response.
         
@@ -174,9 +174,10 @@ class CustomerSupportAgent:
             acknowledgment: Optional acknowledgment phrase that was played (e.g., "Hmm...")
         
         Yields:
-            Tuple of (response text chunk, first_chunk_latency_ms, total_latency_ms)
+            Tuple of (response text chunk, first_chunk_latency_ms, total_latency_ms, usage_dict)
             - first_chunk_latency_ms: only returned on first chunk (time to first token)
             - total_latency_ms: only returned on last chunk (total generation time)
+            - usage_dict: only returned on last chunk, contains actual token counts {'prompt_tokens': int, 'completion_tokens': int, 'total_tokens': int}
         """
         try:
             self.conversation_history.append(
@@ -203,6 +204,9 @@ class CustomerSupportAgent:
             
             start_time = time.time()
             
+            # Track token usage
+            usage_data = None
+            
             # Use chat with tools for function calling
             try:
                 response = await self.llm.achat(
@@ -212,6 +216,16 @@ class CustomerSupportAgent:
                 
                 logger.info("Raw response:")
                 logger.info(response.raw)
+                
+                # Extract actual token usage from response
+                if hasattr(response.raw, 'usage'):
+                    usage = response.raw.usage
+                    usage_data = {
+                        'prompt_tokens': usage.prompt_tokens,
+                        'completion_tokens': usage.completion_tokens,
+                        'total_tokens': usage.total_tokens
+                    }
+                    logger.info(f"Token usage: {usage_data}")
 
                 # Check if model wants to call a tool
                 tool_calls_made = []
@@ -268,6 +282,22 @@ class CustomerSupportAgent:
                         tools=get_available_tools()
                     )
                     
+                    # Update usage data from followup if available
+                    if hasattr(followup_response.raw, 'usage'):
+                        followup_usage = followup_response.raw.usage
+                        if usage_data:
+                            # Combine token counts from both calls
+                            usage_data['prompt_tokens'] += followup_usage.prompt_tokens
+                            usage_data['completion_tokens'] += followup_usage.completion_tokens
+                            usage_data['total_tokens'] += followup_usage.total_tokens
+                        else:
+                            usage_data = {
+                                'prompt_tokens': followup_usage.prompt_tokens,
+                                'completion_tokens': followup_usage.completion_tokens,
+                                'total_tokens': followup_usage.total_tokens
+                            }
+                        logger.info(f"Updated token usage after followup: {usage_data}")
+                    
                     # Get the followup text response
                     full_response = followup_response.message.content if hasattr(followup_response, 'message') and followup_response.message.content else ""
                     
@@ -296,9 +326,9 @@ class CustomerSupportAgent:
                         chunk_count += 1
                         # Only send first chunk latency with first chunk
                         if chunk_count == 1 and first_chunk_time:
-                            yield chunk.delta, (first_chunk_time - start_time) * 1000, None
+                            yield chunk.delta, (first_chunk_time - start_time) * 1000, None, None
                         else:
-                            yield chunk.delta, None, None
+                            yield chunk.delta, None, None, None
             
             end_time = time.time()
             total_latency_ms = (end_time - start_time) * 1000
@@ -306,7 +336,7 @@ class CustomerSupportAgent:
             # If we used achat (non-streaming), yield the full response at once
             if full_response:
                 first_chunk_latency_ms = total_latency_ms
-                yield full_response, first_chunk_latency_ms, None
+                yield full_response, first_chunk_latency_ms, None, None
             
             # Log the complete response
             logger.info(f"Response generated in {total_latency_ms:.0f}ms")
@@ -319,8 +349,8 @@ class CustomerSupportAgent:
                 ChatMessage(role=MessageRole.ASSISTANT, content=full_response)
             )
             
-            # Send final marker with total latency
-            yield "", None, total_latency_ms
+            # Send final marker with total latency and usage data
+            yield "", None, total_latency_ms, usage_data
         
         except Exception as e:
             logger.error(f"Error processing message: {e}")
@@ -328,7 +358,7 @@ class CustomerSupportAgent:
             self.conversation_history.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content=error_response)
             )
-            yield error_response, None, None
+            yield error_response, None, None, None
     
     async def _generate_conversation_summary(self, messages_to_summarize: List[ChatMessage]) -> str:
         """

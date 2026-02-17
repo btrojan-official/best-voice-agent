@@ -254,12 +254,15 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         response_text = ""
                         first_chunk_latency_ms = None
                         total_latency_ms = None
+                        usage_data = None
                         async for chunk_data in agent.process_message(transcription, ack_data["text"]):
-                            chunk, first_latency, total_latency = chunk_data
+                            chunk, first_latency, total_latency, usage = chunk_data
                             if first_latency is not None:
                                 first_chunk_latency_ms = first_latency
                             if total_latency is not None:
                                 total_latency_ms = total_latency
+                            if usage is not None:
+                                usage_data = usage
                             if chunk:  # Only send non-empty chunks
                                 response_text += chunk
                                 await websocket.send_json({
@@ -287,17 +290,32 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         if total_latency_ms:
                             call.usage_stats.llm_latency_ms += total_latency_ms
                         
-                        # Use configured token estimation
-                        estimated_output_tokens = len(response_text) // settings.estimated_token_length
-                        call.usage_stats.output_tokens += estimated_output_tokens
-                        
-                        # Calculate LLM output cost: (tokens / 1M) * price_per_million
-                        call.cost_stats.llm_output_cost += (estimated_output_tokens / 1_000_000) * settings.price_per_million_output_tokens
-                        
-                        # Also add input cost based on input characters
-                        estimated_input_tokens = len(transcription) // settings.estimated_token_length
-                        call.usage_stats.input_tokens += estimated_input_tokens
-                        call.cost_stats.llm_input_cost += (estimated_input_tokens / 1_000_000) * settings.price_per_million_input_tokens
+                        # Use actual token counts from LLM response if available, otherwise estimate
+                        if usage_data:
+                            actual_output_tokens = usage_data['completion_tokens']
+                            actual_input_tokens = usage_data['prompt_tokens']
+                            call.usage_stats.output_tokens += actual_output_tokens
+                            call.usage_stats.input_tokens += actual_input_tokens
+                            
+                            # Calculate LLM costs using actual tokens
+                            call.cost_stats.llm_output_cost += (actual_output_tokens / 1_000_000) * settings.price_per_million_output_tokens
+                            call.cost_stats.llm_input_cost += (actual_input_tokens / 1_000_000) * settings.price_per_million_input_tokens
+                            
+                            logger.info(f"Using actual token counts - Input: {actual_input_tokens}, Output: {actual_output_tokens}")
+                        else:
+                            # Fallback to estimation if usage data not available
+                            estimated_output_tokens = len(response_text) // settings.estimated_token_length
+                            call.usage_stats.output_tokens += estimated_output_tokens
+                            
+                            # Calculate LLM output cost: (tokens / 1M) * price_per_million
+                            call.cost_stats.llm_output_cost += (estimated_output_tokens / 1_000_000) * settings.price_per_million_output_tokens
+                            
+                            # Also add input cost based on input characters
+                            estimated_input_tokens = len(transcription) // settings.estimated_token_length
+                            call.usage_stats.input_tokens += estimated_input_tokens
+                            call.cost_stats.llm_input_cost += (estimated_input_tokens / 1_000_000) * settings.price_per_million_input_tokens
+                            
+                            logger.info(f"Using estimated token counts - Input: {estimated_input_tokens}, Output: {estimated_output_tokens}")
                         
                         # Update conversation summary if available (for long-short term memory)
                         conversation_summary = agent.get_conversation_summary()
@@ -312,7 +330,7 @@ async def websocket_call_endpoint(websocket: WebSocket, call_id: str):
                         await db.update_call(call)
                         
                         try:
-                            audio_data = await text_to_speech_stream(response_text)
+                            audio_data = await text_to_speech_stream(response_text.replace("**", ""))  # Remove any special formatting for TTS
                             await websocket.send_json({
                                 "type": "audio",
                                 "data": base64.b64encode(audio_data).decode('utf-8')
