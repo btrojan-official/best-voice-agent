@@ -148,6 +148,11 @@ class TTSRequest(BaseModel):
 class SettingsUpdateRequest(BaseModel):
     model_name: Optional[str] = None
     temperature: Optional[float] = None
+    price_per_million_input_tokens: Optional[float] = None
+    price_per_million_output_tokens: Optional[float] = None
+    price_per_5s_transcription: Optional[float] = None
+    price_per_10k_tts_chars: Optional[float] = None
+    estimated_token_length: Optional[int] = None
 
 
 class InformationToGatherRequest(BaseModel):

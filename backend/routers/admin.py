@@ -183,6 +183,21 @@ async def update_settings(
                 )
             settings.temperature = request.temperature
         
+        if request.price_per_million_input_tokens is not None:
+            settings.price_per_million_input_tokens = request.price_per_million_input_tokens
+        
+        if request.price_per_million_output_tokens is not None:
+            settings.price_per_million_output_tokens = request.price_per_million_output_tokens
+        
+        if request.price_per_5s_transcription is not None:
+            settings.price_per_5s_transcription = request.price_per_5s_transcription
+        
+        if request.price_per_10k_tts_chars is not None:
+            settings.price_per_10k_tts_chars = request.price_per_10k_tts_chars
+        
+        if request.estimated_token_length is not None:
+            settings.estimated_token_length = request.estimated_token_length
+        
         updated_settings = await db.update_settings(settings)
         logger.info("Updated settings")
         
