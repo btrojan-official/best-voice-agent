@@ -44,8 +44,6 @@ async def transcribe_audio_stream(audio_bytes: bytes) -> Optional[str]:
         try:
             url = urljoin(GROQ_BASE_URL, "audio/transcriptions")
 
-            logger.info(f"{GROQ_BASE_URL} - {url}")
-
             headers = {"Authorization": f"Bearer {groq_api_key}"}
 
             with open(temp_path, "rb") as audio_file:
