@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 
 from routers import chat, admin
 from models import db
+from utils.tts import text_to_speech_stream
+from utils.precomputed_audio import precomputed_audio_manager
 
 load_dotenv()
 
@@ -23,6 +25,52 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def _precompute_audio():
+    """
+    Precompute greeting and acknowledgment audio files.
+    This reduces latency during conversations.
+    """
+    try:
+        # Check if ElevenLabs API key is configured
+        if not os.getenv("ELEVENLABS_API_KEY"):
+            logger.warning("ELEVENLABS_API_KEY not found - skipping audio precomputation")
+            return
+        
+        # Generate greeting audio
+        greeting_text = "Hello! Thank you for contacting customer support. How can I help you today?"
+        logger.info(f"Generating greeting audio: '{greeting_text}'")
+        greeting_audio = await text_to_speech_stream(greeting_text)
+        if greeting_audio:
+            precomputed_audio_manager.save_greeting_audio(greeting_text, greeting_audio)
+            logger.info(f"✓ Greeting audio saved ({len(greeting_audio)} bytes)")
+        else:
+            logger.warning("Failed to generate greeting audio")
+        
+        # Generate acknowledgment audios
+        acknowledgments = [
+            "Let me think...",
+            "Okay...",
+            "I see...",
+            "Alright...",
+            "Got it...",
+        ]
+        
+        for ack_text in acknowledgments:
+            logger.info(f"Generating acknowledgment audio: '{ack_text}'")
+            ack_audio = await text_to_speech_stream(ack_text)
+            if ack_audio:
+                precomputed_audio_manager.save_acknowledgment_audio(ack_text, ack_audio)
+                logger.info(f"✓ '{ack_text}' saved ({len(ack_audio)} bytes)")
+            else:
+                logger.warning(f"Failed to generate '{ack_text}'")
+        
+        logger.info("✓ All precomputed audio files generated successfully!")
+        
+    except Exception as e:
+        logger.error(f"Error precomputing audio: {e}")
+        logger.warning("Continuing without precomputed audio - will generate on-the-fly")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -33,6 +81,10 @@ async def lifespan(app: FastAPI):
     
     os.makedirs("logs", exist_ok=True)
     os.makedirs("data", exist_ok=True)
+    
+    # Precompute greeting and acknowledgment audio for low latency
+    logger.info("Precomputing audio files...")
+    await _precompute_audio()
     
     logger.info("Application startup complete")
     
