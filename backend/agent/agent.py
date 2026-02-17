@@ -112,7 +112,11 @@ class CustomerSupportAgent:
         else:
             gathered_data_status = "No data gathered yet. Start gathering information from the customer."
         
+        # Get current date and time
+        current_datetime = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
+        
         system_prompt = SYSTEM_PROMPT.format(
+            current_datetime=current_datetime,
             information_to_gather=info_text,
             gathered_data_status=gathered_data_status
         )
