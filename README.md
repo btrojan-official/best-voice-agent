@@ -134,7 +134,6 @@ best-voice-agent/
 │   ├── logs/                     # Application logs
 │   ├── main.py                   # Application entry point
 │   ├── auth.py                   # JWT authentication
-│   ├── test_apis.py             # API validation script
 │   ├── requirements.txt          # Python dependencies
 │   └── Dockerfile               # Backend container config
 │
@@ -251,9 +250,6 @@ pip install -r requirements.txt
 cp ../.env.example .env
 # Edit .env with your API keys
 
-# (Optional) Test API connections
-python test_apis.py
-
 # Start backend server
 python main.py
 ```
@@ -280,23 +276,6 @@ npm run dev
 
 **Frontend will be available at:** `http://localhost:5173`
 
----
-
-## 🧪 Testing API Connections
-
-Before starting the application, verify your API keys are working:
-
-```bash
-cd backend
-python test_apis.py
-```
-
-This will test:
-- ✅ OpenRouter API connectivity and model access
-- ✅ ElevenLabs TTS API and voice generation
-- ✅ Groq Whisper API and transcription service
-
----
 
 ## 📖 Usage Guide
 

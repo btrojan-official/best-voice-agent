@@ -24,11 +24,6 @@ cp .env.example .env
    - TRANSCRIPTION_MODEL: Whisper model for transcription (default: whisper-large-v3)
    - ADMIN_USERNAME and ADMIN_PASSWORD: For admin panel access
 
-4. Test API connections (recommended):
-```bash
-cd ..
-python test_apis.py
-```
 
 ## Run
 
